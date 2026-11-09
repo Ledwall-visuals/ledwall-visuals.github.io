@@ -39,9 +39,11 @@ Deno.serve(async (req) => {
   const p = (url.searchParams.get("p") || "").trim().toLowerCase();
   const first = (n: string) => String(n || "").trim().split(/\s+/)[0].toLowerCase();
   const mine = (n: string) => !p || (!!n && first(n) === first(p));
+  // solo=turni: utenti non admin, niente eventi/task/checklist
+  const solo = url.searchParams.get("solo") === "turni";
 
   if (f === "json") {
-    const eventi = (DB.events || []).filter((e: any) => e.start && (e.end || e.start) >= today.slice(0, 8) + "01")
+    const eventi = solo ? [] : (DB.events || []).filter((e: any) => e.start && (e.end || e.start) >= today.slice(0, 8) + "01")
       .sort((a: any, b: any) => a.start.localeCompare(b.start)).slice(0, 40)
       .map((e: any) => ({ nome: e.name, luogo: e.place || "", dal: e.start, al: e.end || e.start }));
     // domeniche dall'inizio del mese corrente per 10 settimane (per il calendario a griglia)
@@ -49,8 +51,8 @@ Deno.serve(async (req) => {
     const PAL = ["#e5484d", "#4f8cff", "#2fbf71", "#f0a020", "#a855f7", "#14b8a6", "#ec4899", "#84cc16"];
     const ini = (n: string) => { const p = String(n || "?").trim().split(/\s+/); return (p[1] ? p[0][0] + p[1][0] : (p[0] || "?").slice(0, 2)).toUpperCase(); };
     const persone = T ? [...(T.persone || []), T.jolly].filter(Boolean).map((n, i) => ({ nome: n, iniziali: ini(n), colore: PAL[i % PAL.length] })) : [];
-    const task = (DB.tasks || []).filter((x: any) => !x.fatto).map((x: any) => ({ testo: x.testo, chi: x.chi || "", scadenza: x.scadenza || "" }));
-    const checklist = (DB.checklists || []).map((c: any) => ({ nome: c.nome, voci: (c.voci || []).map((v: any) => ({ testo: v.testo, fatto: !!v.fatto })) }));
+    const task = solo ? [] : (DB.tasks || []).filter((x: any) => !x.fatto).map((x: any) => ({ testo: x.testo, chi: x.chi || "", scadenza: x.scadenza || "" }));
+    const checklist = solo ? [] : (DB.checklists || []).map((c: any) => ({ nome: c.nome, voci: (c.voci || []).map((v: any) => ({ testo: v.testo, fatto: !!v.fatto })) }));
     return new Response(JSON.stringify({ oggi: today, persone, eventi, turni, task, checklist }), { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
   }
 
@@ -65,7 +67,7 @@ Deno.serve(async (req) => {
     if (loc) L.push(fold("LOCATION:" + icsEsc(loc)));
     L.push("END:VEVENT");
   };
-  for (const e of DB.events || []) {
+  for (const e of solo ? [] : DB.events || []) {
     if (!e.start) continue;
     const scr = (e.screens || []).map((s: any) => `${s.name}: ${s.w}x${s.h} ${s.mode || "moduli"}`).join("\n");
     add("ev-" + e.id, e.start, e.end || e.start, "🎛️ " + (e.name || "Evento"), [e.notes, scr].filter(Boolean).join("\n\n"), e.place || "");
@@ -82,7 +84,7 @@ Deno.serve(async (req) => {
       }
     }
   }
-  for (const x of DB.tasks || []) {
+  for (const x of solo ? [] : DB.tasks || []) {
     if (x.scadenza && !x.fatto && (!x.chi || mine(x.chi))) add("task-" + x.id, x.scadenza, x.scadenza, "✅ " + x.testo + (x.chi ? ` (${x.chi})` : ""));
   }
   L.push("END:VCALENDAR");
