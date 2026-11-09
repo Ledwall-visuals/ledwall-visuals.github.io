@@ -545,7 +545,7 @@ function vAssenze(){
     <div class="mut">${b.nota?esc(b.nota):''}${tc.length?`<div class="warn">🔁 Era di turno ${tc.map(ds=>fmtD(ds)+(turno(ds,0)?' → va '+esc(turno(ds,0)):'')).join(', ')}</div>`:''}</div></div>
     ${!b.wa&&(mio||adm)?`<button class="btn sec sm" data-blkdel="${b.id}">✕</button>`:''}</div>`};
   return `<div class="card"><h2>🚫 Non ci sono</h2>
-  <p class="mut">Se non riesci a esserci blocca un giorno o un periodo. Se eri di turno, al tuo posto va in automatico il prossimo libero della lista (Benni solo se serve).</p>
+  <p class="mut">Se non riesci a esserci blocca un giorno o un periodo. Se eri di turno, al tuo posto va in automatico il prossimo libero della lista.</p>
   ${adm?`<div style="margin-bottom:10px"><label>Chi</label><select id="blkChi">${nomi.map(n=>`<option ${first(n)===me?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`:''}
   <div class="dategrid">
     <div><label>Dal</label><input type="date" id="blkDal" value="${oggi}"></div>
