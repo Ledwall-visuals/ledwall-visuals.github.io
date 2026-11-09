@@ -167,6 +167,9 @@ Deno.serve(async (req) => {
     const risposta = chiSost
       ? `✅ Ok ${first(chi)}, domenica ${breveDi(f.ds)} (${quando}) ti sostituisce ${first(chiSost)}. Turni aggiornati nel gestionale.`
       : `⚠️ Ok ${first(chi)}, ma per domenica ${breveDi(f.ds)} (${quando}) non c'è nessun sostituto disponibile. ${first(T.jolly)}, ci pensi tu?`;
+    // Modalità silenziosa (scelta di Beniamin): il bot legge e aggiorna il gestionale ma non scrive nel gruppo,
+    // a meno che in config_privata ci sia RISPOSTE = "si".
+    if (env.RISPOSTE !== "si") return json({ ok: true, cambio: f, inviato: false, risposta });
     const out = await invia(env.GREEN_CHAT, risposta, md.idMessage || ev.idMessage);
     return json({ ok: true, cambio: f, inviato: out.ok });
   }
