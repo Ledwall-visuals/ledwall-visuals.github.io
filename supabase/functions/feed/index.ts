@@ -3,7 +3,15 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-type Turni = { start: string; persone: string[]; jolly: string; slot: string[]; override: Record<string, string> };
+type Turni = { start: string; persone: string[]; jolly: string; slot: string[]; override: Record<string, string>; assenze?: Record<string, string[]> };
+type Blocco = { nome: string; dal: string; al: string };
+let BLOCCHI: Blocco[] = [];
+const low1 = (n: string) => String(n || "").trim().split(/\s+/)[0].toLowerCase();
+function bloccato(T: Turni, n: string, ds: string) {
+  if (!n) return false; const f = low1(n);
+  if ((T.assenze?.[ds] || []).some((x) => low1(x) === f)) return true;
+  return BLOCCHI.some((b) => low1(b.nome) === f && b.dal <= ds && ds <= b.al);
+}
 
 // Una persona per domenica; mattina (0) e sera (1) modificabili singolarmente
 function turno(T: Turni, ds: string, slot?: number): string {
@@ -14,7 +22,9 @@ function turno(T: Turni, ds: string, slot?: number): string {
   if (!P.length || !T.start || ds < T.start) return "";
   const w = Math.round((Date.parse(ds + "T12:00:00Z") - Date.parse(T.start + "T12:00:00Z")) / (7 * 864e5));
   if (w < 0) return "";
-  return P[w % P.length];
+  // assente -> prossimo libero in lista; jolly solo se nessuno è libero (stessa logica del sito)
+  for (let k = 0; k < P.length; k++) { const n = P[(w + k) % P.length]; if (!bloccato(T, n, ds)) return n; }
+  return bloccato(T, T.jolly, ds) ? "" : (T.jolly || "");
 }
 function iso(d: Date) { return d.toISOString().slice(0, 10); }
 function sundays(from: string, k: number) {
@@ -33,6 +43,8 @@ Deno.serve(async (req) => {
   const { data: row } = await sb.from("condiviso").select("data").eq("id", "main").maybeSingle();
   const DB = (row?.data || {}) as any;
   const T: Turni | null = DB.turni || null;
+  const { data: bl } = await sb.from("blocchi").select("nome,dal,al").gte("al", new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10));
+  BLOCCHI = (bl || []) as Blocco[];
   const today = new Date(Date.now() + 3600e3).toISOString().slice(0, 10); // ~ora italiana
   const f = url.searchParams.get("f") || "ics";
   // p = nome della persona: mostra solo i suoi turni e task (vuoto = tutti)

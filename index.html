@@ -475,14 +475,18 @@ function isSunday(ds){return new Date(ds+'T12:00').getDay()===0}
 function turno(ds,slot){const T=turni();if(slot!==undefined){const os=T.override[ds+':'+slot];if(os!==undefined)return os}const o=T.override[ds];if(o!==undefined)return o;
   const P=T.persone.filter(Boolean);if(!P.length||!T.start||ds<T.start)return '';
   const w=Math.round((new Date(ds+'T12:00')-new Date(T.start+'T12:00'))/(7*864e5));if(w<0)return '';
-  return P[w%P.length]}
+  // se chi tocca è assente: il prossimo libero in lista; il jolly solo se nessuno è libero
+  for(let k=0;k<P.length;k++){const n=P[(w+k)%P.length];if(!bloccato(n,ds))return n}
+  return bloccato(T.jolly,ds)?'':(T.jolly||'')}
+// persona della rotazione senza sostituzioni (per sapere chi è stato sostituito)
+function turnoBase(ds){const T=turni(),P=T.persone.filter(Boolean);if(!P.length||!T.start||ds<T.start)return '';const w=Math.round((new Date(ds+'T12:00')-new Date(T.start+'T12:00'))/(7*864e5));return w<0?'':P[w%P.length]}
 function first(n){return String(n||'').trim().split(/\s+/)[0]}
 function isMe(n){return USER&&n&&first(n).toLowerCase()===first(myName()).toLowerCase()}
 function sundays(k){const out=[];const d=new Date(nextSunday()+'T12:00');for(let i=0;i<k;i++){out.push(d.toISOString().slice(0,10));d.setDate(d.getDate()+7)}return out}
 function vTurni(){
   const T=turni(), opts=[...T.persone,T.jolly].filter(Boolean);
   const sel=(ds,sl)=>{const cur=turno(ds,sl), ov=T.override[ds+':'+sl]!==undefined;
-    return `<select data-turno="${ds}:${sl}" style="${isMe(cur)?'border-color:var(--ok);':''}${ov?'font-style:italic;border-color:var(--warn)':''}"><option value="__auto" ${!ov?'selected':''}>Auto</option>${opts.map(o=>`<option value="${esc(o)}" ${ov&&cur===o?'selected':''}>${esc(o)}${bloccato(o,ds)?' 🚫':''}</option>`).join('')}<option value="" ${ov&&cur===''?'selected':''}>Nessuno</option></select>${cur&&bloccato(cur,ds)?`<div class="bad" style="font-size:12px;margin-top:3px">🚫 ${esc(cur)} non c'è</div>`:''}`};
+    return `<select data-turno="${ds}:${sl}" style="${isMe(cur)?'border-color:var(--ok);':''}${ov?'font-style:italic;border-color:var(--warn)':''}"><option value="__auto" ${!ov?'selected':''}>Auto</option>${opts.map(o=>`<option value="${esc(o)}" ${ov&&cur===o?'selected':''}>${esc(o)}${bloccato(o,ds)?' 🚫':''}</option>`).join('')}<option value="" ${ov&&cur===''?'selected':''}>Nessuno</option></select>${cur&&bloccato(cur,ds)?`<div class="bad" style="font-size:12px;margin-top:3px">🚫 ${esc(cur)} non c'è</div>`:''}${!ov&&cur&&turnoBase(ds)&&cur!==turnoBase(ds)?`<div class="warn" style="font-size:12px;margin-top:3px">🔁 ${esc(cur)} al posto di ${esc(turnoBase(ds))}</div>`:''}`};
   return `<div class="card"><div class="row"><h2 style="margin:0">⛪ Turni della domenica</h2><span class="sp"></span><button class="btn sec sm" data-act="toggleTset">⚙️ Impostazioni</button></div>
   <p class="mut">Di base una persona per domenica (${esc(T.slot[0].toLowerCase())} e ${esc(T.slot[1].toLowerCase())}), a rotazione tra ${T.persone.length} persone. ${esc(T.jolly)} è il jolly. Se qualcuno non c'è, cambia solo la mattina o solo la sera scegliendo un altro nome; "Auto" torna alla rotazione. I cambi sono evidenziati in arancione.</p>
   ${window.TSET?`<div class="screen grid">
@@ -533,13 +537,13 @@ function vAssenze(){
   const T=turni(), adm=isAdmin(), oggi=oggiS(), me=first(myName());
   const nomi=[...T.persone,T.jolly].filter(Boolean);
   const L=tuttiBlocchi().filter(b=>b.al>=oggi).sort((a,b)=>a.dal.localeCompare(b.dal));
-  const turniColpiti=b=>sundays(60).filter(ds=>ds>=b.dal&&ds<=b.al&&[turno(ds,0),turno(ds,1)].some(x=>x&&first(x).toLowerCase()===first(b.nome).toLowerCase()));
+  const turniColpiti=b=>sundays(60).filter(ds=>ds>=b.dal&&ds<=b.al&&[turnoBase(ds),...Object.entries(T.override).filter(([k])=>k.startsWith(ds)).map(([,v])=>v)].some(x=>x&&first(x).toLowerCase()===first(b.nome).toLowerCase()));
   const row=b=>{const tc=turniColpiti(b);const mio=b.user_id&&USER&&b.user_id===USER.id;
     return `<div class="task"><span class="dav" style="background:${pcol(b.nome)};margin:0">${esc(initials(b.nome))}</span><div style="flex:1"><div class="tt"><b>${esc(b.nome)}</b> · ${b.dal===b.al?fmtD(b.dal):fmtD(b.dal)+' → '+fmtD(b.al)}</div>
-    <div class="mut">${b.nota?esc(b.nota):''}${tc.length?`<div class="bad">⚠️ Era di turno: ${tc.map(fmtD).join(', ')}</div>`:''}</div></div>
+    <div class="mut">${b.nota?esc(b.nota):''}${tc.length?`<div class="warn">🔁 Era di turno ${tc.map(ds=>fmtD(ds)+(turno(ds,0)?' → va '+esc(turno(ds,0)):'')).join(', ')}</div>`:''}</div></div>
     ${!b.wa&&(mio||adm)?`<button class="btn sec sm" data-blkdel="${b.id}">✕</button>`:''}</div>`};
   return `<div class="card"><h2>🚫 Non ci sono</h2>
-  <p class="mut">Se non riesci a esserci blocca un giorno o un periodo. Chi è di turno quelle domeniche viene segnalato con 🚫, così si trova un sostituto.</p>
+  <p class="mut">Se non riesci a esserci blocca un giorno o un periodo. Se eri di turno, al tuo posto va in automatico il prossimo libero della lista (Benni solo se serve).</p>
   <div class="grid">
     ${adm?`<div><label>Chi</label><select id="blkChi">${nomi.map(n=>`<option ${first(n)===me?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`:''}
     <div><label>Dal</label><input type="date" id="blkDal" value="${oggi}"></div>
