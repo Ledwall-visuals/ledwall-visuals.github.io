@@ -444,7 +444,7 @@ function vEvent(id){
 /* ---------- Calendario ---------- */
 /* ---------- Turni domenica ---------- */
 function nextSunday(){const d=new Date();d.setDate(d.getDate()+((7-d.getDay())%7));return d.toISOString().slice(0,10)}
-function turni(){if(!DB.turni)DB.turni={start:nextSunday(),persone:['Sebi','Lucas Balcan','Matteo Ciurciun','Edo'],jolly:'Benni',slot:['Mattina','Sera'],override:{}};DB.turni.override=DB.turni.override||{};return DB.turni}
+function turni(){if(!DB.turni)DB.turni={start:nextSunday(),persone:['Sebi','Lucas','Matteo','Edo'],jolly:'Benni',slot:['Mattina','Sera'],override:{}};DB.turni.override=DB.turni.override||{};return DB.turni}
 function isSunday(ds){return new Date(ds+'T12:00').getDay()===0}
 // Una persona per domenica (copre mattina e sera), ma mattina (slot 0) e sera (slot 1) si possono cambiare singolarmente.
 // Override: 'YYYY-MM-DD:0' / 'YYYY-MM-DD:1' per singolo turno, 'YYYY-MM-DD' per tutta la giornata.
