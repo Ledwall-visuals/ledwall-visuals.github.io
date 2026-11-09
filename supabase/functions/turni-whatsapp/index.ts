@@ -2,6 +2,7 @@
 // Chiamata da pg_cron. Parametri (query string):
 //   ?azione=anteprima  -> restituisce il testo senza inviarlo
 //   ?azione=gruppi     -> elenca i gruppi WhatsApp del numero collegato (per trovare il chatId)
+//   ?azione=prova      -> invia il messaggio nella chat con se stesso del numero collegato
 //   ?mese=1            -> mese prossimo invece del mese corrente
 // Configurazione nella tabella public.config_privata (leggibile solo con service role):
 //   GREEN_URL, GREEN_ID, GREEN_TOKEN, GREEN_CHAT (es. 1203...@g.us), TURNI_SECRET.
@@ -68,10 +69,15 @@ Deno.serve(async (req) => {
   const testo = messaggio(data.data.turni as Turni, +(url.searchParams.get("mese") || 0));
   if (azione === "anteprima") return json({ testo });
 
+  let chatId = env.GREEN_CHAT;
+  if (azione === "prova") {
+    const st = await (await fetch(`${green}/getSettings/${env.GREEN_TOKEN}`)).json();
+    chatId = st.wid;
+  }
   const r = await fetch(`${green}/sendMessage/${env.GREEN_TOKEN}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ chatId: env.GREEN_CHAT, message: testo }),
+    body: JSON.stringify({ chatId, message: testo }),
   });
   const out = await r.json().catch(() => ({}));
   return json({ inviato: r.ok, risposta: out, testo }, r.ok ? 200 : 502);
