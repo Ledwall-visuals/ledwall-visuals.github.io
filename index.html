@@ -89,6 +89,8 @@ label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
   input,select,textarea{background:#fff;color:#000;border:1px solid #999}
 }
 .ro{width:100%;border-collapse:collapse}.ro td{padding:9px 4px;border-top:1px solid #ffffff14;vertical-align:top}
+.dategrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.dategrid>div{min-width:0}
+.dategrid input[type=date]{-webkit-appearance:none;appearance:none;width:100%;min-width:0;box-sizing:border-box;display:block;text-align:left;height:44px}
 </style>
 </head>
 <body>
@@ -544,19 +546,20 @@ function vAssenze(){
     ${!b.wa&&(mio||adm)?`<button class="btn sec sm" data-blkdel="${b.id}">✕</button>`:''}</div>`};
   return `<div class="card"><h2>🚫 Non ci sono</h2>
   <p class="mut">Se non riesci a esserci blocca un giorno o un periodo. Se eri di turno, al tuo posto va in automatico il prossimo libero della lista (Benni solo se serve).</p>
-  <div class="grid">
-    ${adm?`<div><label>Chi</label><select id="blkChi">${nomi.map(n=>`<option ${first(n)===me?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`:''}
+  ${adm?`<div style="margin-bottom:10px"><label>Chi</label><select id="blkChi">${nomi.map(n=>`<option ${first(n)===me?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`:''}
+  <div class="dategrid">
     <div><label>Dal</label><input type="date" id="blkDal" value="${oggi}"></div>
-    <div><label>Al (vuoto = un giorno solo)</label><input type="date" id="blkAl"></div>
-    <div style="grid-column:span 2"><label>Nota (facoltativa)</label><input id="blkNota" placeholder="es. sono in vacanza"></div>
-    <div style="align-self:end"><button class="btn" data-blkadd="1">🚫 Blocca</button></div>
-  </div></div>
+    <div><label>Al</label><input type="date" id="blkAl" value="${oggi}"></div>
+  </div>
+  <p class="mut" style="margin:6px 0 12px">Per un giorno solo lascia la stessa data.</p>
+  <button class="btn" data-blkadd="1">🚫 Blocca</button></div>
   <div class="card"><h2>Prossime assenze</h2>${L.map(row).join('')||'<p class="mut">Nessuna assenza segnata.</p>'}</div>`;
 }
+document.addEventListener('change',e=>{if(e.target.id==='blkDal'){const al=document.getElementById('blkAl');if(al&&(!al.value||al.value<e.target.value))al.value=e.target.value}});
 document.addEventListener('click',async e=>{
   const a=e.target.closest&&e.target.closest('[data-blkadd],[data-blkdel]');if(!a||!USER)return;
   if(a.dataset.blkdel){if(!await ask('Togliere questa assenza?'))return;const {error}=await sb.from('blocchi').delete().eq('id',a.dataset.blkdel);if(error){toast('Errore: '+error.message);return}toast('Assenza tolta');return loadBlocchi()}
-  const dal=document.getElementById('blkDal').value, al=document.getElementById('blkAl').value||dal, nota=document.getElementById('blkNota').value.trim();
+  const dal=document.getElementById('blkDal').value, al=document.getElementById('blkAl').value||dal, nota='';
   const chiEl=document.getElementById('blkChi'), nome=chiEl?chiEl.value:first(myName());
   if(!dal){toast('Scegli la data');return} if(al<dal){toast('La data finale è prima di quella iniziale');return}
   const {error}=await sb.from('blocchi').insert({nome,dal,al,nota});if(error){toast('Errore: '+error.message);return}
