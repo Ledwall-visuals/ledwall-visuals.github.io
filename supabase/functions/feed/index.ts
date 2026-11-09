@@ -5,15 +5,15 @@ const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SE
 
 type Turni = { start: string; persone: string[]; jolly: string; slot: string[]; override: Record<string, string> };
 
-function turno(T: Turni, ds: string, slot: number): string {
-  const o = T.override?.[ds + ":" + slot];
+// Una persona per domenica (mattina e sera)
+function turno(T: Turni, ds: string): string {
+  const o = T.override?.[ds];
   if (o !== undefined) return o;
   const P = (T.persone || []).filter(Boolean);
   if (!P.length || !T.start || ds < T.start) return "";
   const w = Math.round((Date.parse(ds + "T12:00:00Z") - Date.parse(T.start + "T12:00:00Z")) / (7 * 864e5));
   if (w < 0) return "";
-  const k = w * 2 + slot, n = P.length, c = Math.floor(k / n);
-  return P[(k + c) % n];
+  return P[w % P.length];
 }
 function iso(d: Date) { return d.toISOString().slice(0, 10); }
 function sundays(from: string, k: number) {
@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     const eventi = (DB.events || []).filter((e: any) => e.start && (e.end || e.start) >= today)
       .sort((a: any, b: any) => a.start.localeCompare(b.start)).slice(0, 10)
       .map((e: any) => ({ nome: e.name, luogo: e.place || "", dal: e.start, al: e.end || e.start }));
-    const turni = T ? sundays(today, 6).map((ds) => ({ data: ds, mattina: turno(T, ds, 0), sera: turno(T, ds, 1), nomi: T.slot })) : [];
+    const turni = T ? sundays(today, 6).map((ds) => ({ data: ds, persona: turno(T, ds) })) : [];
     const task = (DB.tasks || []).filter((x: any) => !x.fatto).map((x: any) => ({ testo: x.testo, chi: x.chi || "", scadenza: x.scadenza || "" }));
     const checklist = (DB.checklists || []).map((c: any) => ({ nome: c.nome, voci: (c.voci || []).map((v: any) => ({ testo: v.testo, fatto: !!v.fatto })) }));
     return new Response(JSON.stringify({ oggi: today, eventi, turni, task, checklist }), { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
@@ -68,10 +68,8 @@ Deno.serve(async (req) => {
   if (T) {
     const from = addDay(today, -28);
     for (const ds of sundays(from, 30)) {
-      for (const sl of [0, 1]) {
-        const n = turno(T, ds, sl);
-        if (n && mine(n)) add(`turno-${ds}-${sl}`, ds, ds, `${sl ? "🌙" : "☀️"} ${T.slot?.[sl] || (sl ? "Sera" : "Mattina")}: ${n}`);
-      }
+      const n = turno(T, ds);
+      if (n && mine(n)) add(`turno-${ds}`, ds, ds, `⛪ Turno domenica: ${n}`, `${T.slot?.[0] || "Mattina"} e ${T.slot?.[1] || "Sera"}`);
     }
   }
   for (const x of DB.tasks || []) {

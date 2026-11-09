@@ -443,51 +443,50 @@ function vEvent(id){
 /* ---------- Calendario ---------- */
 /* ---------- Turni domenica ---------- */
 function nextSunday(){const d=new Date();d.setDate(d.getDate()+((7-d.getDay())%7));return d.toISOString().slice(0,10)}
-function turni(){if(!DB.turni)DB.turni={start:nextSunday(),persone:['Sebastian Costantin','Lucas Balcan','Matteo Ciurciun','Edoardo Hrincescu'],jolly:'Beniamin',slot:['Mattina','Sera'],override:{}};DB.turni.override=DB.turni.override||{};return DB.turni}
+function turni(){if(DB.turni&&DB.turni.override)Object.keys(DB.turni.override).forEach(k=>{if(k.includes(':'))delete DB.turni.override[k]});if(!DB.turni)DB.turni={start:nextSunday(),persone:['Sebastian Costantin','Lucas Balcan','Matteo Ciurciun','Edoardo Hrincescu'],jolly:'Beniamin',slot:['Mattina','Sera'],override:{}};DB.turni.override=DB.turni.override||{};return DB.turni}
 function isSunday(ds){return new Date(ds+'T12:00').getDay()===0}
-function turno(ds,slot){const T=turni();const o=T.override[ds+':'+slot];if(o!==undefined)return o;
+// Una persona per domenica (copre mattina e sera). L'argomento slot è ignorato (compatibilità).
+function turno(ds,slot){const T=turni();const o=T.override[ds];if(o!==undefined)return o;
   const P=T.persone.filter(Boolean);if(!P.length||!T.start||ds<T.start)return '';
   const w=Math.round((new Date(ds+'T12:00')-new Date(T.start+'T12:00'))/(7*864e5));if(w<0)return '';
-  const k=w*2+slot,n=P.length,c=Math.floor(k/n);return P[(k+c)%n]}
+  return P[w%P.length]}
 function first(n){return String(n||'').trim().split(/\s+/)[0]}
 function isMe(n){return USER&&n&&first(n).toLowerCase()===first(myName()).toLowerCase()}
 function sundays(k){const out=[];const d=new Date(nextSunday()+'T12:00');for(let i=0;i<k;i++){out.push(d.toISOString().slice(0,10));d.setDate(d.getDate()+7)}return out}
 function vTurni(){
   const T=turni(), opts=[...T.persone,T.jolly].filter(Boolean);
-  const sel=(ds,sl)=>{const cur=turno(ds,sl), ov=T.override[ds+':'+sl]!==undefined;
-    return `<select data-turno="${ds}:${sl}" style="${isMe(cur)?'border-color:var(--ok);':''}${ov?'font-style:italic':''}"><option value="__auto" ${!ov?'selected':''}>Auto: ${esc(autoTurno(ds,sl)||'—')}</option>${opts.map(o=>`<option ${ov&&cur===o?'selected':''}>${esc(o)}</option>`).join('')}<option value="" ${ov&&cur===''?'selected':''}>Nessuno</option></select>`};
+  const sel=(ds)=>{const cur=turno(ds), ov=T.override[ds]!==undefined;
+    return `<select data-turno="${ds}" style="${isMe(cur)?'border-color:var(--ok);':''}${ov?'font-style:italic':''}"><option value="__auto" ${!ov?'selected':''}>Auto: ${esc(autoTurno(ds)||'—')}</option>${opts.map(o=>`<option ${ov&&cur===o?'selected':''}>${esc(o)}</option>`).join('')}<option value="" ${ov&&cur===''?'selected':''}>Nessuno</option></select>`};
   return `<div class="card"><div class="row"><h2 style="margin:0">⛪ Turni della domenica</h2><span class="sp"></span><button class="btn sec sm" data-act="toggleTset">⚙️ Impostazioni</button></div>
-  <p class="mut">Rotazione automatica tra ${T.persone.length} persone, ${esc(T.jolly)} è il jolly. Per cambiare un turno scegli un nome dal menu; "Auto" torna alla rotazione.</p>
+  <p class="mut">Una persona per domenica (${esc(T.slot[0].toLowerCase())} e ${esc(T.slot[1].toLowerCase())}), a rotazione tra ${T.persone.length} persone. ${esc(T.jolly)} è il jolly. Per cambiare un turno scegli un nome dal menu; "Auto" torna alla rotazione.</p>
   ${window.TSET?`<div class="screen grid">
     <div style="grid-column:span 2"><label>Persone in rotazione (una per riga, in ordine)</label><textarea data-tset="persone" rows="5">${esc(T.persone.join('\n'))}</textarea></div>
     <div><label>Jolly</label><input data-tset="jolly" value="${esc(T.jolly)}"></div>
     <div><label>Prima domenica della rotazione</label><input type="date" data-tset="start" value="${T.start}"></div>
-    <div><label>Nome turno 1</label><input data-tset="slot0" value="${esc(T.slot[0])}"></div>
-    <div><label>Nome turno 2</label><input data-tset="slot1" value="${esc(T.slot[1])}"></div></div>`:''}
-  <table><tr><th>Domenica</th><th>☀️ ${esc(T.slot[0])}</th><th>🌙 ${esc(T.slot[1])}</th></tr>
-  ${sundays(8).map(ds=>`<tr><td>${fmtD(ds)}</td><td>${sel(ds,0)}</td><td>${sel(ds,1)}</td></tr>`).join('')}</table></div>`;
+    </div>`:''}
+  <table><tr><th>Domenica</th><th>Di turno (☀️ ${esc(T.slot[0])} + 🌙 ${esc(T.slot[1])})</th></tr>
+  ${sundays(8).map(ds=>`<tr><td>${fmtD(ds)}</td><td>${sel(ds)}</td></tr>`).join('')}</table></div>`;
 }
-function autoTurno(ds,slot){const T=turni();const o=T.override[ds+':'+slot];delete T.override[ds+':'+slot];const r=turno(ds,slot);if(o!==undefined)T.override[ds+':'+slot]=o;return r}
+function autoTurno(ds){const T=turni();const o=T.override[ds];delete T.override[ds];const r=turno(ds);if(o!==undefined)T.override[ds]=o;return r}
 const PAL=['#e5484d','#4f8cff','#2fbf71','#f0a020','#a855f7','#14b8a6','#ec4899','#84cc16'];
 function pcol(n){const T=turni();const L=[...T.persone,T.jolly].filter(Boolean).map(first);const i=L.indexOf(first(n));return i>=0?PAL[i%PAL.length]:colorOf(n)}
-function dav(n,sl,ds){const T=turni();return `<span class="dav${isMe(n)?' me':''}" style="background:${pcol(n)}" title="${esc((T.slot[sl]||'')+': '+n)}">${esc(initials(n))}<i>${sl?'🌙':'☀️'}</i></span>`}
+function dav(n,sl,ds){const T=turni();return `<span class="dav${isMe(n)?' me':''}" style="background:${pcol(n)}" title="${esc('Di turno: '+n)}">${esc(initials(n))}</span>`}
 function legenda(){const T=turni();return `<div class="row" style="margin-top:10px;gap:12px">${[...T.persone,T.jolly].filter(Boolean).map(n=>`<span class="row" style="gap:5px"><span class="dav" style="background:${pcol(n)};margin:0">${esc(initials(n))}</span><span class="mut">${esc(n)}${n===T.jolly?' (jolly)':''}</span></span>`).join('')}</div>`}
 function vCal(){
   const base=new Date(); base.setDate(1); const oggi=new Date().toISOString().slice(0,10);
-  let h='';
-  for(let m=0;m<3;m++){
-    const d=new Date(base.getFullYear(),base.getMonth()+m,1);
-    const y=d.getFullYear(),mo=d.getMonth(); const days=new Date(y,mo+1,0).getDate(); const off=(d.getDay()+6)%7;
-    h+=`<div class="card"><h2>${d.toLocaleDateString('it-IT',{month:'long',year:'numeric'})}</h2><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">`;
-    ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'].forEach(x=>h+=`<div class="mut" style="text-align:center">${x}</div>`);
-    for(let i=0;i<off;i++)h+='<div></div>';
-    for(let g=1;g<=days;g++){const ds=`${y}-${String(mo+1).padStart(2,'0')}-${String(g).padStart(2,'0')}`;
-      const evs=DB.events.filter(e=>e.start&&e.start<=ds&&ds<=(e.end||e.start));
-      const tu=isSunday(ds)?`<div>${[0,1].map(sl=>{const n=turno(ds,sl);return n?dav(n,sl,ds):''}).join('')}</div>`:'';
-      const tk=(DB.tasks||[]).filter(x=>x.scadenza===ds&&!x.fatto).length;
-      h+=`<div class="calcell${ds===oggi?' today':''}"><div class="mut">${g}${tk?` <span title="${tk} task in scadenza">✅${tk>1?tk:''}</span>`:''}</div>${tu}${evs.map(e=>`<div data-open="${e.id}" style="background:var(--acc);border-radius:4px;padding:1px 4px;margin-top:2px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(e.name||'Evento')}</div>`).join('')}</div>`}
-    h+=`</div>${m===0?legenda():''}</div>`;
-  }
+  const y=base.getFullYear(),mo=base.getMonth(),days=new Date(y,mo+1,0).getDate(),off=(base.getDay()+6)%7;
+  const cell=(d,extra)=>{const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const evs=DB.events.filter(e=>e.start&&e.start<=ds&&ds<=(e.end||e.start));
+    const tn=isSunday(ds)?turno(ds):'';const tu=tn?`<div>${dav(tn,0,ds)}</div>`:'';
+    const tk=(DB.tasks||[]).filter(x=>x.scadenza===ds&&!x.fatto).length;
+    return `<div class="calcell${ds===oggi?' today':''}"${extra?' style="opacity:.4"':''}><div class="mut">${d.getDate()}${extra&&d.getDate()===1?' '+d.toLocaleDateString('it-IT',{month:'short'}):''}${tk?` <span title="${tk} task in scadenza">✅${tk>1?tk:''}</span>`:''}</div>${tu}${evs.map(e=>`<div data-open="${e.id}" style="background:var(--acc);border-radius:4px;padding:1px 4px;margin-top:2px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(e.name||'Evento')}</div>`).join('')}</div>`};
+  let h=`<div class="card"><h2 style="text-transform:capitalize">${base.toLocaleDateString('it-IT',{month:'long',year:'numeric'})}</h2><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">`;
+  ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'].forEach(x=>h+=`<div class="mut" style="text-align:center">${x}</div>`);
+  for(let i=0;i<off;i++)h+='<div></div>';
+  for(let g=1;g<=days;g++)h+=cell(new Date(y,mo,g),false);
+  // giorni del mese successivo fino alla domenica dopo la fine del mese
+  const d=new Date(y,mo,days+1); do{h+=cell(new Date(d),true);d.setDate(d.getDate()+1)}while(new Date(d.getTime()-864e5).getDay()!==0);
+  h+=`</div>${legenda()}</div>`;
   return h+vTurni();
 }
 /* ---------- Task e checklist ---------- */
@@ -544,7 +543,7 @@ if (mode.toLowerCase().startsWith("task")) {
   }
 } else {
   title("⛪ Turni");
-  d.turni.slice(0, fam === "large" ? 4 : 2).forEach(t => line(fd(t.data) + "  ☀️ " + fn(t.mattina) + "  🌙 " + fn(t.sera)));
+  d.turni.slice(0, fam === "large" ? 5 : fam === "small" ? 3 : 2).forEach(t => line(fd(t.data) + "  " + fn(t.persona)));
   if (fam !== "small" && d.eventi.length) {
     w.addSpacer(6); title("🎛️ Eventi");
     d.eventi.slice(0, fam === "large" ? 4 : 1).forEach(e => line(fd(e.dal) + "  " + e.nome));
@@ -624,9 +623,9 @@ function bind(){
     if(t.dataset.tdone){const x=DB.tasks.find(q=>q.id===t.dataset.tdone);x.fatto=t.checked;stamp(x);logChange(`Task "${x.testo}": ${t.checked?'completato ✓':'riaperto'}`);save();render();return}
     if(t.dataset.cl){const [cid,i]=t.dataset.cl.split(':');const c=DB.checklists.find(x=>x.id===cid);c.voci[+i].fatto=t.checked;logChange(`Checklist "${c.nome}": ${t.checked?'✓':'✗'} ${c.voci[+i].testo}`);save();render();return}
     if(t.dataset.newvoce){const v=t.value.trim();if(!v)return;const c=DB.checklists.find(x=>x.id===t.dataset.newvoce);c.voci.push({testo:v,fatto:false});logChange(`Checklist "${c.nome}": aggiunta voce "${v}"`);save();render();setTimeout(()=>{const n=document.querySelector(`[data-newvoce="${c.id}"]`);n&&n.focus()},0);return}
-    if(t.dataset.turno){const T=turni();const [ds,sl]=t.dataset.turno.split(':');const k=ds+':'+sl;const old=turno(ds,+sl);
+    if(t.dataset.turno){const T=turni();const ds=t.dataset.turno;const k=ds;const old=turno(ds);
       if(t.value==='__auto')delete T.override[k];else T.override[k]=t.value;
-      logChange(`Turno ${T.slot[+sl]} di ${fmtD(ds)}: ${old||'nessuno'} → ${turno(ds,+sl)||'nessuno'}`);save();render();return}
+      logChange(`Turno di ${fmtD(ds)}: ${old||'nessuno'} → ${turno(ds)||'nessuno'}`);save();render();return}
     if(t.dataset.tset){const T=turni();const f=t.dataset.tset;
       if(f==='persone')T.persone=t.value.split('\n').map(x=>x.trim()).filter(Boolean);
       else if(f==='slot0')T.slot[0]=t.value;else if(f==='slot1')T.slot[1]=t.value;else T[f]=t.value;
