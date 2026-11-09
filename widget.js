@@ -23,8 +23,8 @@ const taskOn = s => (d.task || []).filter(t => t.scadenza === s);
 function circle(nome, size, alpha) {
   const p = pers[nome] || { iniziali: first(nome).slice(0, 2).toUpperCase(), colore: "#666666" };
   const c = new DrawContext(); c.size = new Size(size, size); c.opaque = false; c.respectScreenScale = true;
-  c.setFillColor(new Color(p.colore, alpha == null ? 1 : alpha)); c.fillEllipse(new Rect(0, 0, size, size));
-  c.setFont(Font.boldSystemFont(size * 0.42)); c.setTextColor(new Color("#ffffff", alpha == null ? 1 : Math.max(alpha, 0.6))); c.setTextAlignedCenter();
+  c.setFillColor(new Color(p.colore, alpha == null ? 0.75 : alpha)); // semi-trasparente: resta leggibile con la tinta iOS c.fillEllipse(new Rect(0, 0, size, size));
+  c.setFont(Font.boldSystemFont(size * 0.42)); c.setTextColor(new Color("#ffffff", alpha == null ? 1 : 0.75)); c.setTextAlignedCenter();
   c.drawTextInRect(p.iniziali || "?", new Rect(0, size * 0.25, size, size * 0.6));
   return c.getImage();
 }
@@ -97,7 +97,7 @@ if (mode.toLowerCase().startsWith("task")) {
       const it = days[r * 7 + i]; const cell = row.addStack(); cell.size = new Size(cw, ch); cell.layoutVertically(); cell.cornerRadius = 6;
       if (!it || it.blank) continue;
       const s = ds(it.dt), dim = !!it.extra;
-      cell.backgroundColor = s === today ? new Color("#4f8cff", 0.35) : new Color("#1b1f27", dim ? 0.4 : 1);
+      cell.backgroundColor = s === today ? new Color("#4f8cff", 0.35) : new Color("#ffffff", dim ? 0.03 : 0.08);
       cell.setPadding(2, 3, 2, 2);
       const top = cell.addStack(); top.centerAlignContent();
       txt(top, String(it.dt.getDate()), Font.semiboldSystemFont(10), dim ? new Color("#7d8491", 0.6) : (s === today ? TX : MUT));
@@ -108,8 +108,8 @@ if (mode.toLowerCase().startsWith("task")) {
       if (t && (t.mattina || t.sera)) {
         cell.addSpacer(1);
         const a = cell.addStack(); a.addSpacer();
-        if (t.mattina === t.sera) { const im = a.addImage(circle(t.mattina, av, dim ? 0.45 : 1)); im.imageSize = new Size(av, av); }
-        else { [t.mattina, t.sera].filter(Boolean).forEach(n => { const im = a.addImage(circle(n, av - 6, dim ? 0.45 : 1)); im.imageSize = new Size(av - 6, av - 6); }); }
+        if (t.mattina === t.sera) { const im = a.addImage(circle(t.mattina, av, dim ? 0.35 : null)); im.imageSize = new Size(av, av); }
+        else { [t.mattina, t.sera].filter(Boolean).forEach(n => { const im = a.addImage(circle(n, av - 6, dim ? 0.35 : null)); im.imageSize = new Size(av - 6, av - 6); }); }
         a.addSpacer();
       } else {
         const e = evOn(s)[0];
