@@ -459,7 +459,7 @@ function vTurni(){
   const T=turni(), opts=[...T.persone,T.jolly].filter(Boolean);
   const sel=(ds,sl)=>{const cur=turno(ds,sl), ov=T.override[ds+':'+sl]!==undefined;
     return `<select data-turno="${ds}:${sl}" style="${isMe(cur)?'border-color:var(--ok);':''}${ov?'font-style:italic;border-color:var(--warn)':''}"><option value="__auto" ${!ov?'selected':''}>Auto</option>${opts.map(o=>`<option ${ov&&cur===o?'selected':''}>${esc(o)}</option>`).join('')}<option value="" ${ov&&cur===''?'selected':''}>Nessuno</option></select>`};
-  return `<div class="card"><div class="row"><h2 style="margin:0">⛪ Turni della domenica</h2><span class="sp"></span><button class="btn sec sm" data-act="toggleTset">⚙️ Impostazioni</button></div>
+  return `<div class="card"><div class="row"><h2 style="margin:0">⛪ Turni della domenica</h2><span class="sp"></span><button class="btn sm" data-act="waTurni" data-m="0">📲 Turni del mese su WhatsApp</button><button class="btn sec sm" data-act="waTurni" data-m="1">📲 Mese prossimo</button><button class="btn sec sm" data-act="toggleTset">⚙️ Impostazioni</button></div>
   <p class="mut">Di base una persona per domenica (${esc(T.slot[0].toLowerCase())} e ${esc(T.slot[1].toLowerCase())}), a rotazione tra ${T.persone.length} persone. ${esc(T.jolly)} è il jolly. Se qualcuno non c'è, cambia solo la mattina o solo la sera scegliendo un altro nome; "Auto" torna alla rotazione. I cambi sono evidenziati in arancione.</p>
   ${window.TSET?`<div class="screen grid">
     <div style="grid-column:span 2"><label>Persone in rotazione (una per riga, in ordine)</label><textarea data-tset="persone" rows="5">${esc(T.persone.join('\n'))}</textarea></div>
@@ -470,6 +470,12 @@ function vTurni(){
   ${sundays(window.TMORE?26:10).map(ds=>`<tr><td>${fmtD(ds)}</td><td>${sel(ds,0)}</td><td>${sel(ds,1)}</td></tr>`).join('')}</table>
   ${window.TMORE?'':'<button class="btn sec sm" data-act="moreTurni" style="margin-top:10px">Mostra altre domeniche</button>'}</div>`;
 }
+function msgTurni(off){const T=turni();const b=new Date();const d=new Date(b.getFullYear(),b.getMonth()+(off||0),1,12);const mo=d.getMonth();
+  const mese=d.toLocaleDateString('it-IT',{month:'long'});const nm=n=>n?first(n):'da definire';const righe=[];
+  while(d.getDay()!==0)d.setDate(d.getDate()+1);
+  while(d.getMonth()===mo){const ds=`${d.getFullYear()}-${String(mo+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const m=turno(ds,0),s=turno(ds,1);righe.push(`• Domenica ${d.getDate()} ${mese}: `+(m===s?nm(m):`☀️ ${nm(m)} · 🌙 ${nm(s)}`));d.setDate(d.getDate()+7)}
+  return `Buongiorno, questi sono i turni di ${mese} (mattina e sera):\n\n${righe.join('\n')}\n\nJolly: ${T.jolly}. Se non puoi, avvisa per tempo 🙏`}
 function autoTurno(ds,sl){const T=turni();const k=ds+':'+sl;const o=T.override[k];delete T.override[k];const r=turno(ds,sl);if(o!==undefined)T.override[k]=o;return r}
 const PAL=['#e5484d','#4f8cff','#2fbf71','#f0a020','#a855f7','#14b8a6','#ec4899','#84cc16'];
 function pcol(n){const T=turni();const L=[...T.persone,T.jolly].filter(Boolean).map(first);const i=L.indexOf(first(n));return i>=0?PAL[i%PAL.length]:colorOf(n)}
@@ -589,6 +595,7 @@ function bind(){
       copyIcs(){copia(FEED_BASE+'?t='+FEEDTOK+(isMe(turni().jolly)?'':'&p='+encodeURIComponent(first(myName()))),'Link calendario copiato');return 'nosave'},
       copyScript(){copia(scriptable(),'Script copiato: ora aprilo in Scriptable');return 'nosave'},
       moreTurni(){window.TMORE=true;render();return 'nosave'},
+      waTurni(){window.open('https://wa.me/?text='+encodeURIComponent(msgTurni(+a.dataset.m)),'_blank');return 'nosave'},
       toggleTset(){window.TSET=!window.TSET;render();return 'nosave'},
       async reset(){if(await ask('Cancellare tutto e ripristinare i dati di esempio? Vale per tutti gli utenti.')){DB=seed();logChange('Ripristinati i dati di esempio (tutto cancellato)')}else return 'nosave'},
     };
