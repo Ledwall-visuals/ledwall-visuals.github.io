@@ -6,6 +6,7 @@
 //   ?azione=configura  -> imposta su Green API il webhook dei messaggi in arrivo verso questa funzione
 //   POST con typeWebhook (webhook Green API): se nel gruppo qualcuno scrive "non ci sono", lo sostituisce col prossimo della lista (il jolly solo se nessun altro può)
 //   ?mese=1            -> mese prossimo invece del mese corrente
+//   ?azione=auto       -> (cron giornaliero) invia il 1° del mese, o il lunedì prima se il 1° è sabato/domenica
 // Configurazione nella tabella public.config_privata (leggibile solo con service role):
 //   GREEN_URL, GREEN_ID, GREEN_TOKEN, GREEN_CHAT (es. 1203...@g.us), TURNI_SECRET,
 //   TELEFONI (JSON {"39333...": "Nome"}) per riconoscere chi scrive nel gruppo.
@@ -184,10 +185,20 @@ Deno.serve(async (req) => {
     return json(Array.isArray(c) ? c.filter((x: { type?: string; id: string }) => x.type === "group" || x.id.endsWith("@g.us")) : c);
   }
 
+  // azione=auto (cron ogni giorno): invia solo il 1° del mese; se il 1° cade di sabato o domenica,
+  // invia il lunedì di quella settimana i turni del mese che sta per iniziare (scelta di Beniamin).
+  let mese = +(url.searchParams.get("mese") || 0);
+  if (azione === "auto") {
+    const oggi = ROME(), g = oggi.getDay();
+    const fra = (n: number) => { const x = new Date(oggi); x.setDate(x.getDate() + n); return x; };
+    if (oggi.getDate() === 1 && g >= 1 && g <= 5) mese = 0;
+    else if (g === 1 && (fra(5).getDate() === 1 || fra(6).getDate() === 1)) mese = 1;
+    else return json({ ok: true, nota: "oggi non si invia" });
+  }
   if (!env.GREEN_CHAT && azione !== "anteprima") return json({ errore: "GREEN_CHAT non impostato" }, 400);
   const { data, error } = await sb.from("condiviso").select("data").eq("id", "main").maybeSingle();
   if (error || !data?.data?.turni) return json({ errore: error?.message || "turni non trovati" }, 500);
-  const testo = messaggio(data.data.turni as Turni, +(url.searchParams.get("mese") || 0), await caricaBlocchi());
+  const testo = messaggio(data.data.turni as Turni, mese, await caricaBlocchi());
   if (azione === "anteprima") return json({ testo });
 
   let chatId = env.GREEN_CHAT;
