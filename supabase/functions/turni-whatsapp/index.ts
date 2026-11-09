@@ -29,13 +29,14 @@ function messaggio(T: Turni, off: number): string {
   const d = new Date(Date.UTC(oggi.getFullYear(), oggi.getMonth() + off, 1, 12));
   const mo = d.getUTCMonth();
   const mese = d.toLocaleDateString("it-IT", { month: "long", timeZone: "UTC" });
+  const breve = mese.slice(0, 1).toUpperCase() + mese.slice(1, 3);
   const nm = (n: string) => (n ? first(n) : "da definire");
   const righe: string[] = [];
   while (d.getUTCDay() !== 0) d.setUTCDate(d.getUTCDate() + 1);
   while (d.getUTCMonth() === mo) {
     const ds = d.toISOString().slice(0, 10);
     const m = turno(T, ds, 0), s = turno(T, ds, 1);
-    righe.push(`• Domenica ${d.getUTCDate()} ${mese}: ` + (m === s ? nm(m) : `☀️ ${nm(m)} · 🌙 ${nm(s)}`));
+    righe.push(`• Domenica ${d.getUTCDate()} ${breve}: ` + (m === s ? nm(m) : `☀️ ${nm(m)} · 🌙 ${nm(s)}`));
     d.setUTCDate(d.getUTCDate() + 7);
   }
   return `Buongiorno, questi sono i turni di ${mese} (mattina e sera):\n\n${righe.join("\n")}\n\nSe non puoi, avvisa per tempo 🙏`;

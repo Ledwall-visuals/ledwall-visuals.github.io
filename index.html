@@ -471,10 +471,10 @@ function vTurni(){
   ${window.TMORE?'':'<button class="btn sec sm" data-act="moreTurni" style="margin-top:10px">Mostra altre domeniche</button>'}</div>`;
 }
 function msgTurni(off){const T=turni();const b=new Date();const d=new Date(b.getFullYear(),b.getMonth()+(off||0),1,12);const mo=d.getMonth();
-  const mese=d.toLocaleDateString('it-IT',{month:'long'});const nm=n=>n?first(n):'da definire';const righe=[];
+  const mese=d.toLocaleDateString('it-IT',{month:'long'});const breve=mese[0].toUpperCase()+mese.slice(1,3);const nm=n=>n?first(n):'da definire';const righe=[];
   while(d.getDay()!==0)d.setDate(d.getDate()+1);
   while(d.getMonth()===mo){const ds=`${d.getFullYear()}-${String(mo+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    const m=turno(ds,0),s=turno(ds,1);righe.push(`• Domenica ${d.getDate()} ${mese}: `+(m===s?nm(m):`☀️ ${nm(m)} · 🌙 ${nm(s)}`));d.setDate(d.getDate()+7)}
+    const m=turno(ds,0),s=turno(ds,1);righe.push(`• Domenica ${d.getDate()} ${breve}: `+(m===s?nm(m):`☀️ ${nm(m)} · 🌙 ${nm(s)}`));d.setDate(d.getDate()+7)}
   return `Buongiorno, questi sono i turni di ${mese} (mattina e sera):\n\n${righe.join('\n')}\n\nSe non puoi, avvisa per tempo 🙏`}
 function autoTurno(ds,sl){const T=turni();const k=ds+':'+sl;const o=T.override[k];delete T.override[k];const r=turno(ds,sl);if(o!==undefined)T.override[k]=o;return r}
 const PAL=['#e5484d','#4f8cff','#2fbf71','#f0a020','#a855f7','#14b8a6','#ec4899','#84cc16'];
