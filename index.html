@@ -70,6 +70,15 @@ label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
 .by{font-size:11px;color:var(--mut);margin-top:4px}
 .log{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);align-items:flex-start}
 .log .av{margin:0;flex:none}
+.dav{position:relative;display:inline-flex;width:24px;height:24px;border-radius:12px;color:#fff;font-size:10px;font-weight:700;align-items:center;justify-content:center;margin:2px 2px 0 0}
+.dav i{position:absolute;right:-5px;bottom:-4px;font-style:normal;font-size:9px}
+.dav.me{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--ok)}
+.calcell{background:var(--panel2);border-radius:6px;min-height:64px;padding:4px;font-size:12px}
+.calcell.today{outline:2px solid var(--acc)}
+.task{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.task input[type=checkbox]{width:20px;height:20px;flex:none}
+.task.fatto .tt{text-decoration:line-through;color:var(--mut)}
+@media(max-width:600px){main{padding:10px}.calcell{min-height:56px;padding:3px}.dav{width:20px;height:20px;font-size:9px}}
 .done td{text-decoration:line-through;color:var(--mut)}
 @media print{
   header,nav,.noprint{display:none!important}
@@ -85,11 +94,12 @@ label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
 <header>
   <h1>🎛️ Gestionale Ledwall</h1>
   <nav id="nav">
-    <button data-v="eventi">Eventi</button>
-    <button data-v="inventario">Inventario</button>
     <button data-v="calendario">Calendario</button>
+    <button data-v="eventi">Eventi</button>
+    <button data-v="task">Task</button>
+    <button data-v="inventario">Inventario</button>
     <button data-v="registro">Registro</button>
-    <button data-v="backup">Backup</button>
+    <button data-v="backup">⚙️ Altro</button>
   </nav>
   <span class="sp"></span><span id="online"></span><span id="saveSt"></span><button class="btn sec sm" id="pwbtn" style="display:none">👤 Profilo</button><button class="btn sec sm" id="logout" style="display:none">Esci</button>
 </header>
@@ -310,14 +320,14 @@ function needs(ev){
 }
 
 /* ===================== VISTE ===================== */
-let view='eventi', curEv=null;
+let view='calendario', curEv=null;
 try{const u=JSON.parse(sessionStorage.getItem(KEY+'-ui'));if(u){view=u.view||view;curEv=u.curEv||null}}catch(e){}
 document.getElementById('nav').onclick=e=>{const v=e.target.dataset.v;if(v){view=v;curEv=null;rememberUI();render()}};
 function rememberUI(){try{sessionStorage.setItem(KEY+'-ui',JSON.stringify({view,curEv}))}catch(e){}}
 function render(){
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===view));
   const app=document.getElementById('app');
-  app.innerHTML = curEv? vEvent(curEv) : ({eventi:vEvents,inventario:vInv,calendario:vCal,registro:vLog,backup:vBackup}[view]||vEvents)();
+  app.innerHTML = curEv? vEvent(curEv) : ({eventi:vEvents,inventario:vInv,calendario:vCal,registro:vLog,backup:vBackup,task:vTask}[view]||vCal)();
   bind(); drawPresence(); if(typeof track==='function'&&CH)track();
 }
 
@@ -458,9 +468,13 @@ function vTurni(){
   ${sundays(8).map(ds=>`<tr><td>${fmtD(ds)}</td><td>${sel(ds,0)}</td><td>${sel(ds,1)}</td></tr>`).join('')}</table></div>`;
 }
 function autoTurno(ds,slot){const T=turni();const o=T.override[ds+':'+slot];delete T.override[ds+':'+slot];const r=turno(ds,slot);if(o!==undefined)T.override[ds+':'+slot]=o;return r}
+const PAL=['#e5484d','#4f8cff','#2fbf71','#f0a020','#a855f7','#14b8a6','#ec4899','#84cc16'];
+function pcol(n){const T=turni();const L=[...T.persone,T.jolly].filter(Boolean).map(first);const i=L.indexOf(first(n));return i>=0?PAL[i%PAL.length]:colorOf(n)}
+function dav(n,sl,ds){const T=turni();return `<span class="dav${isMe(n)?' me':''}" style="background:${pcol(n)}" title="${esc((T.slot[sl]||'')+': '+n)}">${esc(initials(n))}<i>${sl?'🌙':'☀️'}</i></span>`}
+function legenda(){const T=turni();return `<div class="row" style="margin-top:10px;gap:12px">${[...T.persone,T.jolly].filter(Boolean).map(n=>`<span class="row" style="gap:5px"><span class="dav" style="background:${pcol(n)};margin:0">${esc(initials(n))}</span><span class="mut">${esc(n)}${n===T.jolly?' (jolly)':''}</span></span>`).join('')}</div>`}
 function vCal(){
-  const base=new Date(); base.setDate(1);
-  let h=vTurni();
+  const base=new Date(); base.setDate(1); const oggi=new Date().toISOString().slice(0,10);
+  let h='';
   for(let m=0;m<3;m++){
     const d=new Date(base.getFullYear(),base.getMonth()+m,1);
     const y=d.getFullYear(),mo=d.getMonth(); const days=new Date(y,mo+1,0).getDate(); const off=(d.getDay()+6)%7;
@@ -469,16 +483,96 @@ function vCal(){
     for(let i=0;i<off;i++)h+='<div></div>';
     for(let g=1;g<=days;g++){const ds=`${y}-${String(mo+1).padStart(2,'0')}-${String(g).padStart(2,'0')}`;
       const evs=DB.events.filter(e=>e.start&&e.start<=ds&&ds<=(e.end||e.start));
-      const tu=isSunday(ds)?[0,1].map(sl=>{const n=turno(ds,sl);return n?`<div style="font-size:11px;margin-top:2px;${isMe(n)?'color:var(--ok);font-weight:700':''}">${sl?'🌙':'☀️'} ${esc(first(n))}</div>`:''}).join(''):'';
-      h+=`<div style="background:var(--panel2);border-radius:6px;min-height:64px;padding:4px;font-size:12px"><div class="mut">${g}</div>${tu}${evs.map(e=>`<div data-open="${e.id}" style="background:var(--acc);border-radius:4px;padding:1px 4px;margin-top:2px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(e.name||'Evento')}</div>`).join('')}</div>`}
-    h+='</div></div>';
+      const tu=isSunday(ds)?`<div>${[0,1].map(sl=>{const n=turno(ds,sl);return n?dav(n,sl,ds):''}).join('')}</div>`:'';
+      const tk=(DB.tasks||[]).filter(x=>x.scadenza===ds&&!x.fatto).length;
+      h+=`<div class="calcell${ds===oggi?' today':''}"><div class="mut">${g}${tk?` <span title="${tk} task in scadenza">✅${tk>1?tk:''}</span>`:''}</div>${tu}${evs.map(e=>`<div data-open="${e.id}" style="background:var(--acc);border-radius:4px;padding:1px 4px;margin-top:2px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(e.name||'Evento')}</div>`).join('')}</div>`}
+    h+=`</div>${m===0?legenda():''}</div>`;
   }
+  return h+vTurni();
+}
+/* ---------- Task e checklist ---------- */
+function vTask(){
+  DB.tasks=DB.tasks||[];DB.checklists=DB.checklists||[];
+  const T=turni(), chi=[...T.persone,T.jolly].filter(Boolean);
+  const todo=DB.tasks.filter(x=>!x.fatto).sort((a,b)=>(a.scadenza||'9').localeCompare(b.scadenza||'9')), fatti=DB.tasks.filter(x=>x.fatto);
+  const row=x=>`<div class="task${x.fatto?' fatto':''}"><input type="checkbox" data-tdone="${x.id}" ${x.fatto?'checked':''}><div style="flex:1"><div class="tt">${esc(x.testo)}</div><div class="mut">${x.chi?`<span class="dav" style="background:${pcol(x.chi)};width:18px;height:18px;font-size:8px;vertical-align:middle">${esc(initials(x.chi))}</span> ${esc(x.chi)} `:''}${x.scadenza?`· 📅 ${fmtD(x.scadenza)}${!x.fatto&&x.scadenza<new Date().toISOString().slice(0,10)?' <span class="bad">scaduto</span>':''}`:''}</div></div><button class="btn sec sm" data-act="delTask" data-id="${x.id}">✕</button></div>`;
+  let h=`<div class="card"><h2>✅ Task da fare</h2>
+  <div class="grid"><div style="grid-column:span 2"><label>Cosa c'è da fare</label><input id="tTesto" placeholder="es. Comprare cavi Cat6"></div>
+  <div><label>Chi</label><select id="tChi"><option value="">—</option>${chi.map(n=>`<option>${esc(n)}</option>`).join('')}</select></div>
+  <div><label>Scadenza</label><input type="date" id="tData"></div>
+  <div style="align-self:end"><button class="btn" data-act="addTask">+ Aggiungi</button></div></div>
+  ${todo.map(row).join('')||'<p class="mut">Nessun task aperto 🎉</p>'}
+  ${fatti.length?`<h3>Completati (${fatti.length})</h3>${fatti.slice(-10).reverse().map(row).join('')}<button class="btn sec sm" data-act="clearTask" style="margin-top:8px">Elimina completati</button>`:''}</div>`;
+  h+=`<div class="card"><div class="row"><h2 style="margin:0">📋 Checklist</h2><span class="sp"></span><input id="clNome" placeholder="Nome nuova checklist" style="max-width:220px"><button class="btn" data-act="addCl">+ Crea</button></div>
+  <p class="mut">Liste riutilizzabili, es. "Montaggio domenica" o "Carico furgone". Spunta le voci e alla fine premi "Azzera".</p>
+  ${DB.checklists.map(c=>{const n=c.voci.filter(v=>v.fatto).length;return `<div class="screen"><div class="row"><b style="flex:1">${esc(c.nome)}</b><span class="tag ${n===c.voci.length&&n?'ok':''}">${n}/${c.voci.length}</span><button class="btn sec sm" data-act="resetCl" data-id="${c.id}">Azzera</button><button class="btn bad sm" data-act="delCl" data-id="${c.id}">Elimina</button></div>
+    ${c.voci.map((v,i)=>`<div class="task${v.fatto?' fatto':''}"><input type="checkbox" data-cl="${c.id}:${i}" ${v.fatto?'checked':''}><div class="tt" style="flex:1">${esc(v.testo)}</div><button class="btn sec sm" data-act="delVoce" data-id="${c.id}" data-i="${i}">✕</button></div>`).join('')}
+    <div class="row" style="margin-top:8px"><input data-newvoce="${c.id}" placeholder="Nuova voce (Invio per aggiungere)"></div></div>`}).join('')||'<p class="mut">Nessuna checklist.</p>'}</div>`;
   return h;
 }
 
+/* ---------- Widget iPhone ---------- */
+const FEED_BASE='https://rliekssnvssbpkjzpash.supabase.co/functions/v1/feed';
+const SITO_URL='https://fascinating-sable-5fbcf3.netlify.app';
+let FEEDTOK=null;
+async function loadTok(){if(!USER||FEEDTOK)return;const {data}=await sb.from('feed_token').select('token').eq('id',1).maybeSingle();if(data){FEEDTOK=data.token;if(view==='backup')render()}}
+function scriptable(){return `// Gestionale Ledwall – widget per Scriptable
+// Parametro del widget: calendario | task | checklist | checklist:Nome
+const FEED = "${FEED_BASE}?f=json&t=${FEEDTOK}";
+const SITO = "${SITO_URL}";
+const mode = (args.widgetParameter || "calendario").trim();
+const d = await new Request(FEED).loadJSON();
+const fam = config.widgetFamily || "large";
+const max = fam === "small" ? 3 : fam === "medium" ? 4 : 9;
+const w = new ListWidget();
+w.backgroundColor = new Color("#0f1115"); w.url = SITO; w.setPadding(12, 12, 12, 12);
+function title(t) { const x = w.addText(t); x.font = Font.boldSystemFont(13); x.textColor = new Color("#4f8cff"); w.addSpacer(4); }
+function line(t, c) { const x = w.addText(t); x.font = Font.systemFont(fam === "small" ? 11 : 12); x.textColor = new Color(c || "#e8eaef"); x.lineLimit = 1; }
+const fd = s => new Date(s + "T12:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
+const fn = n => (n || "—").split(" ")[0];
+if (mode.toLowerCase().startsWith("task")) {
+  title("✅ Task");
+  if (!d.task.length) line("Niente da fare 🎉", "#9aa1ad");
+  d.task.slice(0, max).forEach(t => line("• " + t.testo + (t.chi ? " · " + fn(t.chi) : "") + (t.scadenza ? " · " + fd(t.scadenza) : "")));
+} else if (mode.toLowerCase().startsWith("check")) {
+  const nome = mode.split(":")[1];
+  const c = (nome ? d.checklist.find(x => x.nome.toLowerCase() === nome.trim().toLowerCase()) : null) || d.checklist[0];
+  if (!c) { title("📋 Checklist"); line("Nessuna checklist", "#9aa1ad"); }
+  else {
+    title("📋 " + c.nome + "  " + c.voci.filter(v => v.fatto).length + "/" + c.voci.length);
+    c.voci.filter(v => !v.fatto).concat(c.voci.filter(v => v.fatto)).slice(0, max).forEach(v => line((v.fatto ? "✓ " : "○ ") + v.testo, v.fatto ? "#9aa1ad" : null));
+  }
+} else {
+  title("⛪ Turni");
+  d.turni.slice(0, fam === "large" ? 4 : 2).forEach(t => line(fd(t.data) + "  ☀️ " + fn(t.mattina) + "  🌙 " + fn(t.sera)));
+  if (fam !== "small" && d.eventi.length) {
+    w.addSpacer(6); title("🎛️ Eventi");
+    d.eventi.slice(0, fam === "large" ? 4 : 1).forEach(e => line(fd(e.dal) + "  " + e.nome));
+  }
+}
+w.addSpacer();
+w.refreshAfterDate = new Date(Date.now() + 30 * 60 * 1000);
+if (config.runsInWidget) Script.setWidget(w); else await w.presentLarge();
+Script.complete();
+`}
+function vWidget(){
+  loadTok();
+  if(!FEEDTOK)return `<div class="card"><h2>📱 Widget iPhone</h2><p class="mut">Caricamento…</p></div>`;
+  const jolly=isMe(turni().jolly);
+  const ics=FEED_BASE.replace('https://','webcal://')+'?t='+FEEDTOK, icsMe=jolly?ics:ics+'&p='+encodeURIComponent(first(myName()));
+  return `<div class="card"><h2>📱 Widget iPhone</h2>
+  <h3>1. Calendario (widget Calendario di Apple)</h3>
+  <p class="mut">Tocca il pulsante e conferma "Iscriviti": nel Calendario dell'iPhone compaiono gli eventi, ${jolly?'<b>tutti i turni</b> (sei il jolly)':`<b>solo i tuoi turni</b> (come ${esc(first(myName()))})`} e i tuoi task con scadenza, e si aggiornano da soli. Poi aggiungi alla Home il widget <b>Calendario</b> di Apple. Il nome deve corrispondere a quello nei turni: lo cambi da 👤 Profilo.</p>
+  <div class="row"><a class="btn" href="${icsMe}" style="text-decoration:none">📅 Iscriviti al calendario</a><button class="btn sec" data-act="copyIcs">Copia il mio link</button></div>
+  <h3>2. Widget personalizzato (calendario, task o checklist)</h3>
+  <p class="mut">Installa l'app gratuita <b>Scriptable</b> dall'App Store. Tocca "Copia script", apri Scriptable, tocca <b>+</b>, incolla e chiamalo "Ledwall". Poi sulla Home: tieni premuto → <b>+</b> → Scriptable → scegli la misura → tocca il widget → Script: <b>Ledwall</b> → Parameter: <b>calendario</b>, <b>task</b> oppure <b>checklist</b> (o <b>checklist:Nome lista</b>). Puoi mettere più widget con parametri diversi.</p>
+  <div class="row"><button class="btn" data-act="copyScript">📋 Copia script</button></div>
+  <p class="mut">⚠️ Questi link contengono una chiave privata: non condividerli fuori dal team.</p></div>`;
+}
+async function copia(t,msg){try{await navigator.clipboard.writeText(t);toast(msg)}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast(msg)}catch(_){toast('Copia non riuscita')}ta.remove()}}
 /* ---------- Backup ---------- */
 function vBackup(){
-  return `<div class="card"><h2>Backup dati</h2>
+  return vWidget()+`<div class="card"><h2>Backup dati</h2>
   <p class="mut">I dati sono sincronizzati online sul tuo account. Puoi comunque esportare un backup (file .json) per sicurezza.</p>
   <div class="row"><button class="btn" data-act="export">⬇️ Esporta backup</button>
   <label class="btn sec" style="margin:0;color:var(--txt);font-size:15px">⬆️ Importa backup<input type="file" id="imp" accept=".json" hidden></label>
@@ -510,6 +604,15 @@ function bind(){
         if(dl){try{await dl.save({filename,data});toast('Backup salvato')}catch(_){toast('Download annullato')}}
         else{const b=new Blob([data],{type:'application/json'});const u=document.createElement('a');u.href=URL.createObjectURL(b);u.download=filename;u.click()}
         return 'nosave'},
+      addTask(){const testo=document.getElementById('tTesto').value.trim();if(!testo)return 'nosave';DB.tasks=DB.tasks||[];const x={id:uid(),testo,chi:document.getElementById('tChi').value,scadenza:document.getElementById('tData').value,fatto:false};stamp(x);DB.tasks.push(x);logChange(`Nuovo task: "${testo}"${x.chi?' per '+x.chi:''}`)},
+      delTask(){const x=DB.tasks.find(t=>t.id===a.dataset.id);DB.tasks=DB.tasks.filter(t=>t.id!==a.dataset.id);logChange(`Eliminato task "${x&&x.testo}"`)},
+      clearTask(){const n=DB.tasks.filter(t=>t.fatto).length;DB.tasks=DB.tasks.filter(t=>!t.fatto);logChange(`Eliminati ${n} task completati`)},
+      addCl(){const nome=document.getElementById('clNome').value.trim();if(!nome)return 'nosave';DB.checklists=DB.checklists||[];DB.checklists.push({id:uid(),nome,voci:[]});logChange(`Nuova checklist "${nome}"`)},
+      async delCl(){const c=DB.checklists.find(x=>x.id===a.dataset.id);if(!await ask(`Eliminare la checklist "${c.nome}"?`))return 'nosave';DB.checklists=DB.checklists.filter(x=>x.id!==c.id);logChange(`Eliminata checklist "${c.nome}"`)},
+      resetCl(){const c=DB.checklists.find(x=>x.id===a.dataset.id);c.voci.forEach(v=>v.fatto=false);logChange(`Checklist "${c.nome}": azzerate le spunte`)},
+      delVoce(){const c=DB.checklists.find(x=>x.id===a.dataset.id);const v=c.voci.splice(+a.dataset.i,1)[0];logChange(`Checklist "${c.nome}": tolta voce "${v&&v.testo}"`)},
+      copyIcs(){copia(FEED_BASE+'?t='+FEEDTOK+(isMe(turni().jolly)?'':'&p='+encodeURIComponent(first(myName()))),'Link calendario copiato');return 'nosave'},
+      copyScript(){copia(scriptable(),'Script copiato: ora aprilo in Scriptable');return 'nosave'},
       toggleTset(){window.TSET=!window.TSET;render();return 'nosave'},
       async reset(){if(await ask('Cancellare tutto e ripristinare i dati di esempio? Vale per tutti gli utenti.')){DB=seed();logChange('Ripristinati i dati di esempio (tutto cancellato)')}else return 'nosave'},
     };
@@ -518,6 +621,9 @@ function bind(){
   app.onchange=e=>{
     const t=e.target, ev=curEv&&DB.events.find(x=>x.id===curEv);
     if(t.id==='logq'){window.LOGQUERY=t.value;render();return}
+    if(t.dataset.tdone){const x=DB.tasks.find(q=>q.id===t.dataset.tdone);x.fatto=t.checked;stamp(x);logChange(`Task "${x.testo}": ${t.checked?'completato ✓':'riaperto'}`);save();render();return}
+    if(t.dataset.cl){const [cid,i]=t.dataset.cl.split(':');const c=DB.checklists.find(x=>x.id===cid);c.voci[+i].fatto=t.checked;logChange(`Checklist "${c.nome}": ${t.checked?'✓':'✗'} ${c.voci[+i].testo}`);save();render();return}
+    if(t.dataset.newvoce){const v=t.value.trim();if(!v)return;const c=DB.checklists.find(x=>x.id===t.dataset.newvoce);c.voci.push({testo:v,fatto:false});logChange(`Checklist "${c.nome}": aggiunta voce "${v}"`);save();render();setTimeout(()=>{const n=document.querySelector(`[data-newvoce="${c.id}"]`);n&&n.focus()},0);return}
     if(t.dataset.turno){const T=turni();const [ds,sl]=t.dataset.turno.split(':');const k=ds+':'+sl;const old=turno(ds,+sl);
       if(t.value==='__auto')delete T.override[k];else T.override[k]=t.value;
       logChange(`Turno ${T.slot[+sl]} di ${fmtD(ds)}: ${old||'nessuno'} → ${turno(ds,+sl)||'nessuno'}`);save();render();return}
