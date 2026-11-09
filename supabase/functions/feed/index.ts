@@ -22,7 +22,7 @@ function sundays(from: string, k: number) {
   const out: string[] = []; for (let i = 0; i < k; i++) { out.push(iso(d)); d.setUTCDate(d.getUTCDate() + 7); } return out;
 }
 function addDay(ds: string, n = 1) { const d = new Date(ds + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return iso(d); }
-function icsEsc(s: string) { return String(s ?? "").replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n"); }
+function icsEsc(s: string) { return String(s ?? "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n"); }
 function fold(line: string) { const out: string[] = []; let s = line; while (s.length > 72) { out.push(s.slice(0, 72)); s = " " + s.slice(72); } out.push(s); return out.join("\r\n"); }
 
 Deno.serve(async (req) => {
@@ -41,13 +41,17 @@ Deno.serve(async (req) => {
   const mine = (n: string) => !p || (!!n && first(n) === first(p));
 
   if (f === "json") {
-    const eventi = (DB.events || []).filter((e: any) => e.start && (e.end || e.start) >= today)
-      .sort((a: any, b: any) => a.start.localeCompare(b.start)).slice(0, 10)
+    const eventi = (DB.events || []).filter((e: any) => e.start && (e.end || e.start) >= today.slice(0, 8) + "01")
+      .sort((a: any, b: any) => a.start.localeCompare(b.start)).slice(0, 40)
       .map((e: any) => ({ nome: e.name, luogo: e.place || "", dal: e.start, al: e.end || e.start }));
-    const turni = T ? sundays(today, 6).map((ds) => ({ data: ds, mattina: turno(T, ds, 0), sera: turno(T, ds, 1) })) : [];
+    // domeniche dall'inizio del mese corrente per 10 settimane (per il calendario a griglia)
+    const turni = T ? sundays(today.slice(0, 8) + "01", 10).map((ds) => ({ data: ds, mattina: turno(T, ds, 0), sera: turno(T, ds, 1) })) : [];
+    const PAL = ["#e5484d", "#4f8cff", "#2fbf71", "#f0a020", "#a855f7", "#14b8a6", "#ec4899", "#84cc16"];
+    const ini = (n: string) => { const p = String(n || "?").trim().split(/\s+/); return (p[1] ? p[0][0] + p[1][0] : (p[0] || "?").slice(0, 2)).toUpperCase(); };
+    const persone = T ? [...(T.persone || []), T.jolly].filter(Boolean).map((n, i) => ({ nome: n, iniziali: ini(n), colore: PAL[i % PAL.length] })) : [];
     const task = (DB.tasks || []).filter((x: any) => !x.fatto).map((x: any) => ({ testo: x.testo, chi: x.chi || "", scadenza: x.scadenza || "" }));
     const checklist = (DB.checklists || []).map((c: any) => ({ nome: c.nome, voci: (c.voci || []).map((v: any) => ({ testo: v.testo, fatto: !!v.fatto })) }));
-    return new Response(JSON.stringify({ oggi: today, eventi, turni, task, checklist }), { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
+    return new Response(JSON.stringify({ oggi: today, persone, eventi, turni, task, checklist }), { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
   }
 
   const L: string[] = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Gestionale Ledwall//IT", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",

@@ -180,7 +180,7 @@ async function changePw(){
 }
 /* ===================== COLLABORAZIONE ===================== */
 function myName(){return (USER&&USER.user_metadata&&USER.user_metadata.nome)||(USER&&USER.email?USER.email.split('@')[0]:'Io')}
-function initials(n){const p=String(n||'?').trim().split(/\s+/);return ((p[0]||'?')[0]+(p[1]?p[1][0]:'')).toUpperCase()}
+function initials(n){const p=String(n||'?').trim().split(/\s+/);return (p[1]?p[0][0]+p[1][0]:(p[0]||'?').slice(0,2)).toUpperCase()}
 function colorOf(id){let h=0;for(const c of String(id))h=(h*31+c.charCodeAt(0))%360;return `hsl(${h},65%,45%)`}
 function ago(iso){if(!iso)return '';const m=Math.round((Date.now()-new Date(iso))/60000);if(m<1)return 'adesso';if(m<60)return m+' min fa';const h=Math.round(m/60);if(h<24)return h+' h fa';return new Date(iso).toLocaleDateString('it-IT',{day:'2-digit',month:'short'})+' '+new Date(iso).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}
 let LOGQ=[];
@@ -444,7 +444,7 @@ function vEvent(id){
 /* ---------- Calendario ---------- */
 /* ---------- Turni domenica ---------- */
 function nextSunday(){const d=new Date();d.setDate(d.getDate()+((7-d.getDay())%7));return d.toISOString().slice(0,10)}
-function turni(){if(!DB.turni)DB.turni={start:nextSunday(),persone:['Sebastian Costantin','Lucas Balcan','Matteo Ciurciun','Edoardo Hrincescu'],jolly:'Beniamin',slot:['Mattina','Sera'],override:{}};DB.turni.override=DB.turni.override||{};return DB.turni}
+function turni(){if(!DB.turni)DB.turni={start:nextSunday(),persone:['Sebi','Lucas Balcan','Matteo Ciurciun','Edo'],jolly:'Benni',slot:['Mattina','Sera'],override:{}};DB.turni.override=DB.turni.override||{};return DB.turni}
 function isSunday(ds){return new Date(ds+'T12:00').getDay()===0}
 // Una persona per domenica (copre mattina e sera), ma mattina (slot 0) e sera (slot 1) si possono cambiare singolarmente.
 // Override: 'YYYY-MM-DD:0' / 'YYYY-MM-DD:1' per singolo turno, 'YYYY-MM-DD' per tutta la giornata.
@@ -519,43 +519,15 @@ const FEED_BASE='https://rliekssnvssbpkjzpash.supabase.co/functions/v1/feed';
 const SITO_URL='https://fascinating-sable-5fbcf3.netlify.app';
 let FEEDTOK=null;
 async function loadTok(){if(!USER||FEEDTOK)return;const {data}=await sb.from('feed_token').select('token').eq('id',1).maybeSingle();if(data){FEEDTOK=data.token;if(view==='backup')render()}}
-function scriptable(){return `// Gestionale Ledwall – widget per Scriptable
+function scriptable(){return `// Gestionale Ledwall – widget per Scriptable (si aggiorna da solo)
 // Parametro del widget: calendario | task | checklist | checklist:Nome
-const FEED = "${FEED_BASE}?f=json&t=${FEEDTOK}";
-const SITO = "${SITO_URL}";
-const mode = (args.widgetParameter || "calendario").trim();
-const d = await new Request(FEED).loadJSON();
-const fam = config.widgetFamily || "large";
-const max = fam === "small" ? 3 : fam === "medium" ? 4 : 9;
-const w = new ListWidget();
-w.backgroundColor = new Color("#0f1115"); w.url = SITO; w.setPadding(12, 12, 12, 12);
-function title(t) { const x = w.addText(t); x.font = Font.boldSystemFont(13); x.textColor = new Color("#4f8cff"); w.addSpacer(4); }
-function line(t, c) { const x = w.addText(t); x.font = Font.systemFont(fam === "small" ? 11 : 12); x.textColor = new Color(c || "#e8eaef"); x.lineLimit = 1; }
-const fd = s => new Date(s + "T12:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
-const fn = n => (n || "—").split(" ")[0];
-if (mode.toLowerCase().startsWith("task")) {
-  title("✅ Task");
-  if (!d.task.length) line("Niente da fare 🎉", "#9aa1ad");
-  d.task.slice(0, max).forEach(t => line("• " + t.testo + (t.chi ? " · " + fn(t.chi) : "") + (t.scadenza ? " · " + fd(t.scadenza) : "")));
-} else if (mode.toLowerCase().startsWith("check")) {
-  const nome = mode.split(":")[1];
-  const c = (nome ? d.checklist.find(x => x.nome.toLowerCase() === nome.trim().toLowerCase()) : null) || d.checklist[0];
-  if (!c) { title("📋 Checklist"); line("Nessuna checklist", "#9aa1ad"); }
-  else {
-    title("📋 " + c.nome + "  " + c.voci.filter(v => v.fatto).length + "/" + c.voci.length);
-    c.voci.filter(v => !v.fatto).concat(c.voci.filter(v => v.fatto)).slice(0, max).forEach(v => line((v.fatto ? "✓ " : "○ ") + v.testo, v.fatto ? "#9aa1ad" : null));
-  }
-} else {
-  title("⛪ Turni");
-  d.turni.slice(0, fam === "large" ? 5 : fam === "small" ? 3 : 2).forEach(t => line(fd(t.data) + "  " + (t.mattina === t.sera ? fn(t.mattina) : "☀️ " + fn(t.mattina) + " 🌙 " + fn(t.sera))));
-  if (fam !== "small" && d.eventi.length) {
-    w.addSpacer(6); title("🎛️ Eventi");
-    d.eventi.slice(0, fam === "large" ? 4 : 1).forEach(e => line(fd(e.dal) + "  " + e.nome));
-  }
-}
-w.addSpacer();
-w.refreshAfterDate = new Date(Date.now() + 30 * 60 * 1000);
-if (config.runsInWidget) Script.setWidget(w); else await w.presentLarge();
+const FEED_TOKEN = "${FEEDTOK}";
+const CODE_URL = "${SITO_URL}/widget.js";
+const fm = FileManager.local(), f = fm.joinPath(fm.documentsDirectory(), "ledwall-widget.js");
+let code;
+try { code = await new Request(CODE_URL + "?v=" + Date.now()).loadString(); if (!code.includes("ListWidget")) throw 0; fm.writeString(f, code); }
+catch (e) { code = fm.fileExists(f) ? fm.readString(f) : ""; }
+await eval("(async () => {" + code + "\\n})()");
 Script.complete();
 `}
 function vWidget(){
