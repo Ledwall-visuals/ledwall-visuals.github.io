@@ -20,16 +20,13 @@ const turni = {}; (d.turni || []).forEach(t => turni[t.data] = t);
 const evOn = s => (d.eventi || []).filter(e => e.dal <= s && s <= e.al);
 const taskOn = s => (d.task || []).filter(t => t.scadenza === s);
 
-// cerchio con iniziali fatto con uno stack (non un'immagine): resta visibile anche con la tinta di iOS
-function dot(parent, nome, size, dim) {
+function circle(nome, size, alpha) {
   const p = pers[nome] || { iniziali: first(nome).slice(0, 2).toUpperCase(), colore: "#666666" };
-  const c = parent.addStack(); c.size = new Size(size, size); c.cornerRadius = size / 2;
-  c.backgroundColor = new Color(p.colore, dim ? 0.3 : 0.6);
-  c.borderColor = new Color("#ffffff", dim ? 0.25 : 0.55); c.borderWidth = 1.5;
-  c.centerAlignContent(); c.addSpacer();
-  const t = c.addText(p.iniziali || "?"); t.font = Font.boldSystemFont(size * 0.42); t.textColor = new Color("#ffffff", dim ? 0.6 : 1); t.lineLimit = 1; t.minimumScaleFactor = 0.6;
-  c.addSpacer();
-  return c;
+  const c = new DrawContext(); c.size = new Size(size, size); c.opaque = false; c.respectScreenScale = true;
+  c.setFillColor(new Color(p.colore, alpha == null ? 0.75 : alpha)); // semi-trasparente: resta leggibile con la tinta iOS c.fillEllipse(new Rect(0, 0, size, size)); c.setStrokeColor(new Color("#ffffff", alpha == null ? 0.5 : 0.25)); c.setLineWidth(size * 0.07); c.strokeEllipse(new Rect(size * 0.04, size * 0.04, size * 0.92, size * 0.92));
+  c.setFont(Font.boldSystemFont(size * 0.42)); c.setTextColor(new Color("#ffffff", alpha == null ? 1 : 0.75)); c.setTextAlignedCenter();
+  c.drawTextInRect(p.iniziali || "?", new Rect(0, size * 0.25, size, size * 0.6));
+  return c.getImage();
 }
 function txt(stack, s, font, color) { const t = stack.addText(s); t.font = font; t.textColor = color || TX; t.lineLimit = 1; return t; }
 
@@ -42,7 +39,7 @@ if (mode.toLowerCase().startsWith("task")) {
   if (!d.task.length) txt(w, "Niente da fare 🎉", Font.systemFont(12), MUT);
   d.task.slice(0, max).forEach(t => {
     const r = w.addStack(); r.centerAlignContent();
-    if (t.chi) { dot(r, t.chi, 16); r.addSpacer(6); }
+    if (t.chi) { const im = r.addImage(circle(t.chi, 16)); im.imageSize = new Size(16, 16); r.addSpacer(6); }
     txt(r, t.testo, Font.systemFont(12)); r.addSpacer();
     if (t.scadenza && fam !== "small") txt(r, new Date(t.scadenza + "T12:00").toLocaleDateString("it-IT", { day: "numeric", month: "short" }), Font.systemFont(11), t.scadenza < today ? new Color("#e5484d") : MUT);
     w.addSpacer(4);
@@ -66,8 +63,8 @@ if (mode.toLowerCase().startsWith("task")) {
     txt(w, new Date(nx.data + "T12:00").toLocaleDateString("it-IT", { day: "numeric", month: "long" }), Font.systemFont(12), MUT);
     w.addSpacer(8);
     const r = w.addStack(); r.centerAlignContent();
-    if (nx.mattina === nx.sera) { dot(r, nx.mattina, 44); r.addSpacer(8); txt(r, first(nx.mattina), Font.boldSystemFont(15)); }
-    else { [nx.mattina, nx.sera].forEach((n, i) => { const s = r.addStack(); s.layoutVertically(); dot(s, n, 34); txt(s, (i ? "🌙 " : "☀️ ") + first(n), Font.systemFont(10)); r.addSpacer(8); }); }
+    if (nx.mattina === nx.sera) { const im = r.addImage(circle(nx.mattina, 44)); im.imageSize = new Size(44, 44); r.addSpacer(8); txt(r, first(nx.mattina), Font.boldSystemFont(15)); }
+    else { [nx.mattina, nx.sera].forEach((n, i) => { const s = r.addStack(); s.layoutVertically(); const im = s.addImage(circle(n, 34)); im.imageSize = new Size(34, 34); txt(s, (i ? "🌙 " : "☀️ ") + first(n), Font.systemFont(10)); r.addSpacer(8); }); }
   }
 } else {
   // calendario a griglia: large = mese intero (+ giorni fino alla domenica dopo), medium = settimana corrente e successiva
@@ -111,8 +108,8 @@ if (mode.toLowerCase().startsWith("task")) {
       if (t && (t.mattina || t.sera)) {
         cell.addSpacer(1);
         const a = cell.addStack(); a.addSpacer();
-        if (t.mattina === t.sera) { dot(a, t.mattina, av, dim); }
-        else { [t.mattina, t.sera].filter(Boolean).forEach(n => { dot(a, n, av - 6, dim); }); }
+        if (t.mattina === t.sera) { const im = a.addImage(circle(t.mattina, av, dim ? 0.35 : null)); im.imageSize = new Size(av, av); }
+        else { [t.mattina, t.sera].filter(Boolean).forEach(n => { const im = a.addImage(circle(n, av - 6, dim ? 0.35 : null)); im.imageSize = new Size(av - 6, av - 6); }); }
         a.addSpacer();
       } else {
         const e = evOn(s)[0];
