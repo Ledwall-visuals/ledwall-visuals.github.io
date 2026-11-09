@@ -84,8 +84,8 @@ function trovaTurno(T: Turni, B: Blocco[], chi: string, testo: string): { ds: st
   return null;
 }
 
-// Firma in cima a ogni messaggio mandato dal sistema (richiesta di Beniamin).
-const FIRMA = "Ledwall Bot 🤖\n\n";
+// Firma in cima ai messaggi del sistema: tolta su richiesta di Beniamin (ora il bot ha un numero suo).
+const FIRMA = "";
 
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b, null, 2), { status, headers: { "content-type": "application/json; charset=utf-8" } });
