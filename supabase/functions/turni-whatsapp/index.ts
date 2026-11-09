@@ -37,7 +37,7 @@ function messaggio(T: Turni, off: number): string {
     righe.push(`• Domenica ${d.getUTCDate()} ${mese}: ` + (m === s ? nm(m) : `☀️ ${nm(m)} · 🌙 ${nm(s)}`));
     d.setUTCDate(d.getUTCDate() + 7);
   }
-  return `Buongiorno, questi sono i turni di ${mese} (mattina e sera):\n\n${righe.join("\n")}\n\nJolly: ${nm(T.jolly)}. Se non puoi, avvisa per tempo 🙏`;
+  return `Buongiorno, questi sono i turni di ${mese} (mattina e sera):\n\n${righe.join("\n")}\n\nSe non puoi, avvisa per tempo 🙏`;
 }
 
 const json = (b: unknown, status = 200) =>
