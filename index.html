@@ -475,7 +475,7 @@ function msgTurni(off){const T=turni();const b=new Date();const d=new Date(b.get
   while(d.getDay()!==0)d.setDate(d.getDate()+1);
   while(d.getMonth()===mo){const ds=`${d.getFullYear()}-${String(mo+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const m=turno(ds,0),s=turno(ds,1);righe.push(`• Domenica ${d.getDate()} ${mese}: `+(m===s?nm(m):`☀️ ${nm(m)} · 🌙 ${nm(s)}`));d.setDate(d.getDate()+7)}
-  return `Buongiorno, questi sono i turni di ${mese} (mattina e sera):\n\n${righe.join('\n')}\n\nJolly: ${T.jolly}. Se non puoi, avvisa per tempo 🙏`}
+  return `Buongiorno, questi sono i turni di ${mese} (mattina e sera):\n\n${righe.join('\n')}\n\nJolly: ${nm(T.jolly)}. Se non puoi, avvisa per tempo 🙏`}
 function autoTurno(ds,sl){const T=turni();const k=ds+':'+sl;const o=T.override[k];delete T.override[k];const r=turno(ds,sl);if(o!==undefined)T.override[k]=o;return r}
 const PAL=['#e5484d','#4f8cff','#2fbf71','#f0a020','#a855f7','#14b8a6','#ec4899','#84cc16'];
 function pcol(n){const T=turni();const L=[...T.persone,T.jolly].filter(Boolean).map(first);const i=L.indexOf(first(n));return i>=0?PAL[i%PAL.length]:colorOf(n)}
