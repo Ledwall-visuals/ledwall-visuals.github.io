@@ -3,7 +3,8 @@
 //   ?azione=anteprima  -> restituisce il testo senza inviarlo
 //   ?azione=gruppi     -> elenca i gruppi WhatsApp del numero collegato (per trovare il chatId)
 //   ?mese=1            -> mese prossimo invece del mese corrente
-// Segreti: GREEN_ID, GREEN_TOKEN, GREEN_CHAT (es. 1203...@g.us), TURNI_SECRET.
+// Configurazione nella tabella public.config_privata (leggibile solo con service role):
+//   GREEN_URL, GREEN_ID, GREEN_TOKEN, GREEN_CHAT (es. 1203...@g.us), TURNI_SECRET.
 // NB: la logica dei turni copia turno() di index.html: se cambia lì, aggiornarla anche qui.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -43,19 +44,25 @@ const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b, null, 2), { status, headers: { "content-type": "application/json; charset=utf-8" } });
 
 Deno.serve(async (req) => {
-  const env = Deno.env.toObject();
+  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const { data: rows } = await sb.from("config_privata").select("chiave,valore");
+  const env: Record<string, string> = Object.fromEntries((rows || []).map((r: { chiave: string; valore: string }) => [r.chiave, r.valore]));
   if (!env.TURNI_SECRET || req.headers.get("x-turni-secret") !== env.TURNI_SECRET) return json({ errore: "non autorizzato" }, 401);
   const url = new URL(req.url);
   const azione = url.searchParams.get("azione") || "invia";
-  const green = `https://api.green-api.com/waInstance${env.GREEN_ID}`;
+  const green = `${env.GREEN_URL || "https://api.green-api.com"}/waInstance${env.GREEN_ID}`;
 
+  if (azione === "stato") {
+    const r = await fetch(`${green}/getStateInstance/${env.GREEN_TOKEN}`);
+    return json(await r.json().catch(() => ({ status: r.status })));
+  }
   if (azione === "gruppi") {
     const r = await fetch(`${green}/getContacts/${env.GREEN_TOKEN}`);
     const c = await r.json();
     return json(Array.isArray(c) ? c.filter((x: { type?: string; id: string }) => x.type === "group" || x.id.endsWith("@g.us")) : c);
   }
 
-  const sb = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+  if (!env.GREEN_CHAT && azione !== "anteprima") return json({ errore: "GREEN_CHAT non impostato" }, 400);
   const { data, error } = await sb.from("condiviso").select("data").eq("id", "main").maybeSingle();
   if (error || !data?.data?.turni) return json({ errore: error?.message || "turni non trovati" }, 500);
   const testo = messaggio(data.data.turni as Turni, +(url.searchParams.get("mese") || 0));
