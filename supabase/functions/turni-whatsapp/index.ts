@@ -39,6 +39,7 @@ function messaggio(T: Turni, off: number): string {
   while (d.getUTCMonth() === mo) {
     const ds = d.toISOString().slice(0, 10);
     const m = turno(T, ds, 0), s = turno(T, ds, 1);
+    if (!m && !s && T.start && ds < T.start) { d.setUTCDate(d.getUTCDate() + 7); continue; }
     righe.push(`• Domenica ${d.getUTCDate()} ${breve}: ` + (m === s ? nm(m) : `☀️ ${nm(m)} · 🌙 ${nm(s)}`));
     d.setUTCDate(d.getUTCDate() + 7);
   }
