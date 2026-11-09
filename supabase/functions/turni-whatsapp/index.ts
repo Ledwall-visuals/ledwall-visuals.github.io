@@ -56,9 +56,9 @@ const breveDi = (ds: string) => {
 const ASSENZA = /(non\s+(ci\s+)?(sono|saro|sarò|posso|riesco|vengo|ce\s+la\s+faccio))|\bassente\b|\bmanco\b/i;
 
 // Sostituto: il prossimo nella lista dopo chi è assente, saltando chi ha già detto di non esserci quel giorno;
-// il jolly solo se nessuno della lista è disponibile.
-function sostituto(T: Turni, chi: string, ds: string): string | null {
-  const no = new Set([...(T.assenze?.[ds] || []), chi].map((n) => first(n).toLowerCase()));
+// e chi ha un blocco di indisponibilità (tabella blocchi) su quella data; il jolly solo se nessuno della lista è disponibile.
+function sostituto(T: Turni, chi: string, ds: string, bloccati: string[] = []): string | null {
+  const no = new Set([...(T.assenze?.[ds] || []), ...bloccati, chi].map((n) => first(n).toLowerCase()));
   const P = (T.persone || []).filter(Boolean);
   const i = P.findIndex((p) => first(p).toLowerCase() === first(chi).toLowerCase());
   for (let k = 1; k <= P.length; k++) {
@@ -140,7 +140,8 @@ Deno.serve(async (req) => {
     if (!f) return json({ ok: true, nota: "nessun turno trovato" });
     T.assenze = T.assenze || {};
     T.assenze[f.ds] = [...new Set([...(T.assenze[f.ds] || []), chi])];
-    const chiSost = sostituto(T, chi, f.ds);
+    const { data: bl } = await sb.from("blocchi").select("nome").lte("dal", f.ds).gte("al", f.ds);
+    const chiSost = sostituto(T, chi, f.ds, (bl || []).map((b: { nome: string }) => b.nome));
     const quando = f.slots.length === 2 ? "mattina e sera" : f.slots[0] === 0 ? "mattina" : "sera";
     T.override = T.override || {};
     if (chiSost) for (const sl of f.slots) T.override[`${f.ds}:${sl}`] = chiSost;
