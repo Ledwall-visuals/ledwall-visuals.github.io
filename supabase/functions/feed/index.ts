@@ -5,8 +5,9 @@ const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SE
 
 type Turni = { start: string; persone: string[]; jolly: string; slot: string[]; override: Record<string, string> };
 
-// Una persona per domenica (mattina e sera)
-function turno(T: Turni, ds: string): string {
+// Una persona per domenica; mattina (0) e sera (1) modificabili singolarmente
+function turno(T: Turni, ds: string, slot?: number): string {
+  if (slot !== undefined) { const os = T.override?.[ds + ":" + slot]; if (os !== undefined) return os; }
   const o = T.override?.[ds];
   if (o !== undefined) return o;
   const P = (T.persone || []).filter(Boolean);
@@ -43,7 +44,7 @@ Deno.serve(async (req) => {
     const eventi = (DB.events || []).filter((e: any) => e.start && (e.end || e.start) >= today)
       .sort((a: any, b: any) => a.start.localeCompare(b.start)).slice(0, 10)
       .map((e: any) => ({ nome: e.name, luogo: e.place || "", dal: e.start, al: e.end || e.start }));
-    const turni = T ? sundays(today, 6).map((ds) => ({ data: ds, persona: turno(T, ds) })) : [];
+    const turni = T ? sundays(today, 6).map((ds) => ({ data: ds, mattina: turno(T, ds, 0), sera: turno(T, ds, 1) })) : [];
     const task = (DB.tasks || []).filter((x: any) => !x.fatto).map((x: any) => ({ testo: x.testo, chi: x.chi || "", scadenza: x.scadenza || "" }));
     const checklist = (DB.checklists || []).map((c: any) => ({ nome: c.nome, voci: (c.voci || []).map((v: any) => ({ testo: v.testo, fatto: !!v.fatto })) }));
     return new Response(JSON.stringify({ oggi: today, eventi, turni, task, checklist }), { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
@@ -68,8 +69,13 @@ Deno.serve(async (req) => {
   if (T) {
     const from = addDay(today, -28);
     for (const ds of sundays(from, 30)) {
-      const n = turno(T, ds);
-      if (n && mine(n)) add(`turno-${ds}`, ds, ds, `⛪ Turno domenica: ${n}`, `${T.slot?.[0] || "Mattina"} e ${T.slot?.[1] || "Sera"}`);
+      const m = turno(T, ds, 0), e = turno(T, ds, 1);
+      const s0 = T.slot?.[0] || "Mattina", s1 = T.slot?.[1] || "Sera";
+      if (m && m === e) { if (mine(m)) add(`turno-${ds}`, ds, ds, `⛪ Turno domenica: ${m}`, `${s0} e ${s1}`); }
+      else {
+        if (m && mine(m)) add(`turno-${ds}-0`, ds, ds, `☀️ ${s0}: ${m}`);
+        if (e && mine(e)) add(`turno-${ds}-1`, ds, ds, `🌙 ${s1}: ${e}`);
+      }
     }
   }
   for (const x of DB.tasks || []) {
