@@ -3,9 +3,12 @@
 //   ?azione=anteprima  -> restituisce il testo senza inviarlo
 //   ?azione=gruppi     -> elenca i gruppi WhatsApp del numero collegato (per trovare il chatId)
 //   ?azione=prova      -> invia il messaggio nella chat con se stesso del numero collegato
+//   ?azione=configura  -> imposta su Green API il webhook dei messaggi in arrivo verso questa funzione
+//   POST con typeWebhook (webhook Green API): se nel gruppo qualcuno scrive "non ci sono", lo sostituisce col jolly
 //   ?mese=1            -> mese prossimo invece del mese corrente
 // Configurazione nella tabella public.config_privata (leggibile solo con service role):
-//   GREEN_URL, GREEN_ID, GREEN_TOKEN, GREEN_CHAT (es. 1203...@g.us), TURNI_SECRET.
+//   GREEN_URL, GREEN_ID, GREEN_TOKEN, GREEN_CHAT (es. 1203...@g.us), TURNI_SECRET,
+//   TELEFONI (JSON {"39333...": "Nome"}) per riconoscere chi scrive nel gruppo.
 // NB: la logica dei turni copia turno() di index.html: se cambia lì, aggiornarla anche qui.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -42,6 +45,31 @@ function messaggio(T: Turni, off: number): string {
   return `Buongiorno, questi sono i turni di ${mese} (mattina e sera):\n\n${righe.join("\n")}\n\nSe non puoi, avvisa per tempo 🙏`;
 }
 
+const ROME = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Rome" }));
+const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const breveDi = (ds: string) => {
+  const d = new Date(ds + "T12:00Z");
+  const m = d.toLocaleDateString("it-IT", { month: "long", timeZone: "UTC" });
+  return `${d.getUTCDate()} ${m[0].toUpperCase()}${m.slice(1, 3)}`;
+};
+const ASSENZA = /(non\s+(ci\s+)?(sono|saro|sarò|posso|riesco|vengo|ce\s+la\s+faccio))|\bassente\b|\bmanco\b/i;
+
+// Cerca la domenica (oggi o futura, entro 8 settimane) in cui `chi` ha un turno e che corrisponde al testo.
+function trovaTurno(T: Turni, chi: string, testo: string): { ds: string; slots: number[] } | null {
+  const t = testo.toLowerCase();
+  const soloMattina = /mattin/.test(t) && !/sera/.test(t), soloSera = /sera/.test(t) && !/mattin/.test(t);
+  const giorno = t.match(/\b([0-9]{1,2})\b/);
+  const d = ROME(); d.setHours(12, 0, 0, 0);
+  while (d.getDay() !== 0) d.setDate(d.getDate() + 1);
+  for (let i = 0; i < 8; i++, d.setDate(d.getDate() + 7)) {
+    const ds = iso(d);
+    if (giorno && d.getDate() !== +giorno[1]) continue;
+    const slots = [0, 1].filter((sl) => (!soloMattina || sl === 0) && (!soloSera || sl === 1) && first(turno(T, ds, sl)).toLowerCase() === first(chi).toLowerCase());
+    if (slots.length) return { ds, slots };
+  }
+  return null;
+}
+
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b, null, 2), { status, headers: { "content-type": "application/json; charset=utf-8" } });
 
@@ -49,10 +77,63 @@ Deno.serve(async (req) => {
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const { data: rows } = await sb.from("config_privata").select("chiave,valore");
   const env: Record<string, string> = Object.fromEntries((rows || []).map((r: { chiave: string; valore: string }) => [r.chiave, r.valore]));
-  if (!env.TURNI_SECRET || req.headers.get("x-turni-secret") !== env.TURNI_SECRET) return json({ errore: "non autorizzato" }, 401);
+  const auth = req.headers.get("x-turni-secret") || (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  if (!env.TURNI_SECRET || auth !== env.TURNI_SECRET) return json({ errore: "non autorizzato" }, 401);
   const url = new URL(req.url);
   const azione = url.searchParams.get("azione") || "invia";
   const green = `${env.GREEN_URL || "https://api.green-api.com"}/waInstance${env.GREEN_ID}`;
+  const invia = async (chatId: string, message: string, quotedMessageId?: string) => {
+    const r = await fetch(`${green}/sendMessage/${env.GREEN_TOKEN}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chatId, message, ...(quotedMessageId ? { quotedMessageId } : {}) }),
+    });
+    return { ok: r.ok, risposta: await r.json().catch(() => ({})) };
+  };
+
+  if (azione === "configura") {
+    const r = await fetch(`${green}/setSettings/${env.GREEN_TOKEN}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        webhookUrl: `${Deno.env.get("SUPABASE_URL")}/functions/v1/turni-whatsapp?azione=webhook`,
+        webhookUrlToken: env.TURNI_SECRET,
+        incomingWebhook: "yes", outgoingWebhook: "no", outgoingMessageWebhook: "no", outgoingAPIMessageWebhook: "no",
+        stateWebhook: "no", deviceWebhook: "no", pollMessageWebhook: "no", incomingCallWebhook: "no",
+      }),
+    });
+    return json(await r.json().catch(() => ({ status: r.status })));
+  }
+
+  if (azione === "webhook") {
+    // Webhook Green API: si guardano solo i messaggi in arrivo nel gruppo del team, tutto il resto viene ignorato.
+    const ev = await req.json().catch(() => ({}));
+    const sd = ev?.senderData || {}, md = ev?.messageData || {};
+    if (ev?.typeWebhook !== "incomingMessageReceived" || sd.chatId !== env.GREEN_CHAT) return json({ ok: true });
+    const testo: string = md.textMessageData?.textMessage || md.extendedTextMessageData?.text || "";
+    if (!ASSENZA.test(testo)) return json({ ok: true });
+    const tel: Record<string, string> = JSON.parse(env.TELEFONI || "{}");
+    const chi = tel[String(sd.sender || "").replace(/@.*/, "")];
+    if (!chi) return json({ ok: true, nota: "numero non riconosciuto" });
+
+    const { data: row, error } = await sb.from("condiviso").select("data").eq("id", "main").maybeSingle();
+    if (error || !row?.data?.turni) return json({ errore: error?.message || "turni non trovati" }, 500);
+    const DB = row.data, T = DB.turni as Turni;
+    const jolly = T.jolly;
+    if (first(chi).toLowerCase() === first(jolly).toLowerCase()) return json({ ok: true, nota: "il jolly non si sostituisce da solo" });
+    const f = trovaTurno(T, chi, testo);
+    if (!f) return json({ ok: true, nota: "nessun turno trovato" });
+
+    T.override = T.override || {};
+    for (const sl of f.slots) T.override[`${f.ds}:${sl}`] = jolly;
+    DB._t = Date.now();
+    const { error: e2 } = await sb.from("condiviso").update({ data: DB, updated_at: new Date().toISOString(), updated_by: null }).eq("id", "main");
+    if (e2) return json({ errore: e2.message }, 500);
+    const quando = f.slots.length === 2 ? "mattina e sera" : f.slots[0] === 0 ? "mattina" : "sera";
+    await sb.from("registro").insert({ user_id: null, nome: "WhatsApp", testo: `Turni: ${first(chi)} non c'è domenica ${breveDi(f.ds)} (${quando}), sostituito da ${first(jolly)}` });
+    const out = await invia(env.GREEN_CHAT, `✅ Ok ${first(chi)}, domenica ${breveDi(f.ds)} (${quando}) ti sostituisce ${first(jolly)}. Turni aggiornati nel gestionale.`, md.idMessage || ev.idMessage);
+    return json({ ok: true, cambio: f, inviato: out.ok });
+  }
 
   if (azione === "stato") {
     const r = await fetch(`${green}/getStateInstance/${env.GREEN_TOKEN}`);
@@ -75,11 +156,6 @@ Deno.serve(async (req) => {
     const st = await (await fetch(`${green}/getSettings/${env.GREEN_TOKEN}`)).json();
     chatId = st.wid;
   }
-  const r = await fetch(`${green}/sendMessage/${env.GREEN_TOKEN}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ chatId, message: testo }),
-  });
-  const out = await r.json().catch(() => ({}));
-  return json({ inviato: r.ok, risposta: out, testo }, r.ok ? 200 : 502);
+  const out = await invia(chatId, testo);
+  return json({ inviato: out.ok, risposta: out.risposta, testo }, out.ok ? 200 : 502);
 });
