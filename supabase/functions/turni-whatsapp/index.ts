@@ -9,14 +9,26 @@
 // Configurazione nella tabella public.config_privata (leggibile solo con service role):
 //   GREEN_URL, GREEN_ID, GREEN_TOKEN, GREEN_CHAT (es. 1203...@g.us), TURNI_SECRET,
 //   TELEFONI (JSON {"39333...": "Nome"}) per riconoscere chi scrive nel gruppo.
-// NB: la logica dei turni copia turno() di index.html: se cambia lì, aggiornarla anche qui.
+// NB: la logica dei turni copia turno()/bloccato() di index.html: se cambia lì, aggiornarla anche qui.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 type Turni = { start: string; persone: string[]; jolly: string; slot: string[]; override: Record<string, string>; assenze?: Record<string, string[]> };
 
 const first = (n: string) => String(n || "").trim().split(/\s+/)[0];
 
-function turno(T: Turni, ds: string, slot: number): string {
+type Blocco = { nome: string; dal: string; al: string };
+// Blocchi = tabella blocchi + assenze dette nel gruppo (turni.assenze), come tuttiBlocchi() del sito.
+function tuttiBlocchi(T: Turni, B: Blocco[]): Blocco[] {
+  const wa = Object.entries(T.assenze || {}).flatMap(([ds, L]) => (L || []).map((nome) => ({ nome, dal: ds, al: ds })));
+  return [...B, ...wa];
+}
+function bloccato(T: Turni, B: Blocco[], n: string, ds: string): boolean {
+  if (!n) return false;
+  const f = first(n).toLowerCase();
+  return tuttiBlocchi(T, B).some((b) => first(b.nome).toLowerCase() === f && b.dal <= ds && ds <= b.al);
+}
+// Copia di turno() del sito: se chi tocca è bloccato va il prossimo libero della lista, il jolly solo se nessuno è libero.
+function turno(T: Turni, ds: string, slot: number, B: Blocco[] = []): string {
   const ov = T.override || {};
   if (ov[ds + ":" + slot] !== undefined) return ov[ds + ":" + slot];
   if (ov[ds] !== undefined) return ov[ds];
@@ -24,10 +36,11 @@ function turno(T: Turni, ds: string, slot: number): string {
   if (!P.length || !T.start || ds < T.start) return "";
   const w = Math.round((new Date(ds + "T12:00Z").getTime() - new Date(T.start + "T12:00Z").getTime()) / (7 * 864e5));
   if (w < 0) return "";
-  return P[w % P.length];
+  for (let k = 0; k < P.length; k++) { const n = P[(w + k) % P.length]; if (!bloccato(T, B, n, ds)) return n; }
+  return bloccato(T, B, T.jolly, ds) ? "" : (T.jolly || "");
 }
 
-function messaggio(T: Turni, off: number): string {
+function messaggio(T: Turni, off: number, B: Blocco[]): string {
   const oggi = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Rome" }));
   const d = new Date(Date.UTC(oggi.getFullYear(), oggi.getMonth() + off, 1, 12));
   const mo = d.getUTCMonth();
@@ -38,7 +51,7 @@ function messaggio(T: Turni, off: number): string {
   while (d.getUTCDay() !== 0) d.setUTCDate(d.getUTCDate() + 1);
   while (d.getUTCMonth() === mo) {
     const ds = d.toISOString().slice(0, 10);
-    const m = turno(T, ds, 0), s = turno(T, ds, 1);
+    const m = turno(T, ds, 0, B), s = turno(T, ds, 1, B);
     if (!m && !s && T.start && ds < T.start) { d.setUTCDate(d.getUTCDate() + 7); continue; }
     righe.push(`• Domenica ${d.getUTCDate()} ${breve}: ` + (m === s ? nm(m) : `☀️ ${nm(m)} · 🌙 ${nm(s)}`));
     d.setUTCDate(d.getUTCDate() + 7);
@@ -55,21 +68,8 @@ const breveDi = (ds: string) => {
 };
 const ASSENZA = /(non\s+(ci\s+)?(sono|saro|sarò|posso|riesco|vengo|ce\s+la\s+faccio))|\bassente\b|\bmanco\b/i;
 
-// Sostituto: il prossimo nella lista dopo chi è assente, saltando chi ha già detto di non esserci quel giorno;
-// e chi ha un blocco di indisponibilità (tabella blocchi) su quella data; il jolly solo se nessuno della lista è disponibile.
-function sostituto(T: Turni, chi: string, ds: string, bloccati: string[] = []): string | null {
-  const no = new Set([...(T.assenze?.[ds] || []), ...bloccati, chi].map((n) => first(n).toLowerCase()));
-  const P = (T.persone || []).filter(Boolean);
-  const i = P.findIndex((p) => first(p).toLowerCase() === first(chi).toLowerCase());
-  for (let k = 1; k <= P.length; k++) {
-    const p = P[((i < 0 ? -1 : i) + k) % P.length];
-    if (!no.has(first(p).toLowerCase())) return p;
-  }
-  return no.has(first(T.jolly).toLowerCase()) ? null : T.jolly;
-}
-
 // Cerca la domenica (oggi o futura, entro 8 settimane) in cui `chi` ha un turno e che corrisponde al testo.
-function trovaTurno(T: Turni, chi: string, testo: string): { ds: string; slots: number[] } | null {
+function trovaTurno(T: Turni, B: Blocco[], chi: string, testo: string): { ds: string; slots: number[] } | null {
   const t = testo.toLowerCase();
   const soloMattina = /mattin/.test(t) && !/sera/.test(t), soloSera = /sera/.test(t) && !/mattin/.test(t);
   const giorno = t.match(/\b([0-9]{1,2})\b/);
@@ -78,7 +78,7 @@ function trovaTurno(T: Turni, chi: string, testo: string): { ds: string; slots: 
   for (let i = 0; i < 8; i++, d.setDate(d.getDate() + 7)) {
     const ds = iso(d);
     if (giorno && d.getDate() !== +giorno[1]) continue;
-    const slots = [0, 1].filter((sl) => (!soloMattina || sl === 0) && (!soloSera || sl === 1) && first(turno(T, ds, sl)).toLowerCase() === first(chi).toLowerCase());
+    const slots = [0, 1].filter((sl) => (!soloMattina || sl === 0) && (!soloSera || sl === 1) && first(turno(T, ds, sl, B)).toLowerCase() === first(chi).toLowerCase());
     if (slots.length) return { ds, slots };
   }
   return null;
@@ -92,6 +92,11 @@ const json = (b: unknown, status = 200) =>
 
 Deno.serve(async (req) => {
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const caricaBlocchi = async (): Promise<Blocco[]> => {
+    const da = new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10);
+    const { data } = await sb.from("blocchi").select("nome,dal,al").gte("al", da);
+    return (data || []) as Blocco[];
+  };
   const { data: rows } = await sb.from("config_privata").select("chiave,valore");
   const env: Record<string, string> = Object.fromEntries((rows || []).map((r: { chiave: string; valore: string }) => [r.chiave, r.valore]));
   const auth = req.headers.get("x-turni-secret") || (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
@@ -136,16 +141,25 @@ Deno.serve(async (req) => {
     const { data: row, error } = await sb.from("condiviso").select("data").eq("id", "main").maybeSingle();
     if (error || !row?.data?.turni) return json({ errore: error?.message || "turni non trovati" }, 500);
     const DB = row.data, T = DB.turni as Turni;
-    const f = trovaTurno(T, chi, testo);
+    const B = await caricaBlocchi();
+    const f = trovaTurno(T, B, chi, testo);
     if (!f) return json({ ok: true, nota: "nessun turno trovato" });
-    T.assenze = T.assenze || {};
-    T.assenze[f.ds] = [...new Set([...(T.assenze[f.ds] || []), chi])];
-    const { data: bl } = await sb.from("blocchi").select("nome").lte("dal", f.ds).gte("al", f.ds);
-    const chiSost = sostituto(T, chi, f.ds, (bl || []).map((b: { nome: string }) => b.nome));
     const quando = f.slots.length === 2 ? "mattina e sera" : f.slots[0] === 0 ? "mattina" : "sera";
     T.override = T.override || {};
-    if (chiSost) for (const sl of f.slots) T.override[`${f.ds}:${sl}`] = chiSost;
-    else for (const sl of f.slots) T.override[`${f.ds}:${sl}`] = "";
+    T.assenze = T.assenze || {};
+    const io = (n?: string) => n !== undefined && first(n).toLowerCase() === first(chi).toLowerCase();
+    if (f.slots.length === 2) {
+      // Tutta la giornata: si segna l'assenza e la rotazione del sito/feed sceglie il prossimo libero.
+      T.assenze[f.ds] = [...new Set([...(T.assenze[f.ds] || []), chi])];
+      for (const k of [f.ds, `${f.ds}:0`, `${f.ds}:1`]) if (io(T.override[k])) delete T.override[k];
+    } else {
+      // Solo mattina o solo sera: override di quel turno col prossimo libero (escluso chi scrive).
+      const sl = f.slots[0];
+      const tmp: Turni = { ...T, override: { ...T.override }, assenze: { ...T.assenze, [f.ds]: [...(T.assenze[f.ds] || []), chi] } };
+      delete tmp.override[`${f.ds}:${sl}`]; if (io(tmp.override[f.ds])) delete tmp.override[f.ds];
+      T.override[`${f.ds}:${sl}`] = turno(tmp, f.ds, sl, B);
+    }
+    const chiSost = turno(T, f.ds, f.slots[0], B);
     DB._t = Date.now();
     const { error: e2 } = await sb.from("condiviso").update({ data: DB, updated_at: new Date().toISOString(), updated_by: null }).eq("id", "main");
     if (e2) return json({ errore: e2.message }, 500);
@@ -170,7 +184,7 @@ Deno.serve(async (req) => {
   if (!env.GREEN_CHAT && azione !== "anteprima") return json({ errore: "GREEN_CHAT non impostato" }, 400);
   const { data, error } = await sb.from("condiviso").select("data").eq("id", "main").maybeSingle();
   if (error || !data?.data?.turni) return json({ errore: error?.message || "turni non trovati" }, 500);
-  const testo = messaggio(data.data.turni as Turni, +(url.searchParams.get("mese") || 0));
+  const testo = messaggio(data.data.turni as Turni, +(url.searchParams.get("mese") || 0), await caricaBlocchi());
   if (azione === "anteprima") return json({ testo });
 
   let chatId = env.GREEN_CHAT;
