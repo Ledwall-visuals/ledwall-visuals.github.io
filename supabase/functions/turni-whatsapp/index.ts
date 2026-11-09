@@ -84,6 +84,9 @@ function trovaTurno(T: Turni, chi: string, testo: string): { ds: string; slots: 
   return null;
 }
 
+// Firma in cima a ogni messaggio mandato dal sistema (richiesta di Beniamin).
+const FIRMA = "Ledwall Bot 🤖\n\n";
+
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b, null, 2), { status, headers: { "content-type": "application/json; charset=utf-8" } });
 
@@ -100,7 +103,7 @@ Deno.serve(async (req) => {
     const r = await fetch(`${green}/sendMessage/${env.GREEN_TOKEN}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chatId, message, ...(quotedMessageId ? { quotedMessageId } : {}) }),
+      body: JSON.stringify({ chatId, message: FIRMA + message, ...(quotedMessageId ? { quotedMessageId } : {}) }),
     });
     return { ok: r.ok, risposta: await r.json().catch(() => ({})) };
   };
