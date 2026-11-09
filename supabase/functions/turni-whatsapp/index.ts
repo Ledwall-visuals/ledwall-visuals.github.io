@@ -4,7 +4,7 @@
 //   ?azione=gruppi     -> elenca i gruppi WhatsApp del numero collegato (per trovare il chatId)
 //   ?azione=prova      -> invia il messaggio nella chat con se stesso del numero collegato
 //   ?azione=configura  -> imposta su Green API il webhook dei messaggi in arrivo verso questa funzione
-//   POST con typeWebhook (webhook Green API): se nel gruppo qualcuno scrive "non ci sono", lo sostituisce col jolly
+//   POST con typeWebhook (webhook Green API): se nel gruppo qualcuno scrive "non ci sono", lo sostituisce col prossimo della lista (il jolly solo se nessun altro può)
 //   ?mese=1            -> mese prossimo invece del mese corrente
 // Configurazione nella tabella public.config_privata (leggibile solo con service role):
 //   GREEN_URL, GREEN_ID, GREEN_TOKEN, GREEN_CHAT (es. 1203...@g.us), TURNI_SECRET,
@@ -12,7 +12,7 @@
 // NB: la logica dei turni copia turno() di index.html: se cambia lì, aggiornarla anche qui.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-type Turni = { start: string; persone: string[]; jolly: string; slot: string[]; override: Record<string, string> };
+type Turni = { start: string; persone: string[]; jolly: string; slot: string[]; override: Record<string, string>; assenze?: Record<string, string[]> };
 
 const first = (n: string) => String(n || "").trim().split(/\s+/)[0];
 
@@ -53,6 +53,19 @@ const breveDi = (ds: string) => {
   return `${d.getUTCDate()} ${m[0].toUpperCase()}${m.slice(1, 3)}`;
 };
 const ASSENZA = /(non\s+(ci\s+)?(sono|saro|sarò|posso|riesco|vengo|ce\s+la\s+faccio))|\bassente\b|\bmanco\b/i;
+
+// Sostituto: il prossimo nella lista dopo chi è assente, saltando chi ha già detto di non esserci quel giorno;
+// il jolly solo se nessuno della lista è disponibile.
+function sostituto(T: Turni, chi: string, ds: string): string | null {
+  const no = new Set([...(T.assenze?.[ds] || []), chi].map((n) => first(n).toLowerCase()));
+  const P = (T.persone || []).filter(Boolean);
+  const i = P.findIndex((p) => first(p).toLowerCase() === first(chi).toLowerCase());
+  for (let k = 1; k <= P.length; k++) {
+    const p = P[((i < 0 ? -1 : i) + k) % P.length];
+    if (!no.has(first(p).toLowerCase())) return p;
+  }
+  return no.has(first(T.jolly).toLowerCase()) ? null : T.jolly;
+}
 
 // Cerca la domenica (oggi o futura, entro 8 settimane) in cui `chi` ha un turno e che corrisponde al testo.
 function trovaTurno(T: Turni, chi: string, testo: string): { ds: string; slots: number[] } | null {
@@ -119,19 +132,23 @@ Deno.serve(async (req) => {
     const { data: row, error } = await sb.from("condiviso").select("data").eq("id", "main").maybeSingle();
     if (error || !row?.data?.turni) return json({ errore: error?.message || "turni non trovati" }, 500);
     const DB = row.data, T = DB.turni as Turni;
-    const jolly = T.jolly;
-    if (first(chi).toLowerCase() === first(jolly).toLowerCase()) return json({ ok: true, nota: "il jolly non si sostituisce da solo" });
     const f = trovaTurno(T, chi, testo);
     if (!f) return json({ ok: true, nota: "nessun turno trovato" });
-
+    T.assenze = T.assenze || {};
+    T.assenze[f.ds] = [...new Set([...(T.assenze[f.ds] || []), chi])];
+    const chiSost = sostituto(T, chi, f.ds);
+    const quando = f.slots.length === 2 ? "mattina e sera" : f.slots[0] === 0 ? "mattina" : "sera";
     T.override = T.override || {};
-    for (const sl of f.slots) T.override[`${f.ds}:${sl}`] = jolly;
+    if (chiSost) for (const sl of f.slots) T.override[`${f.ds}:${sl}`] = chiSost;
+    else for (const sl of f.slots) T.override[`${f.ds}:${sl}`] = "";
     DB._t = Date.now();
     const { error: e2 } = await sb.from("condiviso").update({ data: DB, updated_at: new Date().toISOString(), updated_by: null }).eq("id", "main");
     if (e2) return json({ errore: e2.message }, 500);
-    const quando = f.slots.length === 2 ? "mattina e sera" : f.slots[0] === 0 ? "mattina" : "sera";
-    await sb.from("registro").insert({ user_id: null, nome: "WhatsApp", testo: `Turni: ${first(chi)} non c'è domenica ${breveDi(f.ds)} (${quando}), sostituito da ${first(jolly)}` });
-    const out = await invia(env.GREEN_CHAT, `✅ Ok ${first(chi)}, domenica ${breveDi(f.ds)} (${quando}) ti sostituisce ${first(jolly)}. Turni aggiornati nel gestionale.`, md.idMessage || ev.idMessage);
+    await sb.from("registro").insert({ user_id: null, nome: "WhatsApp", testo: `Turni: ${first(chi)} non c'è domenica ${breveDi(f.ds)} (${quando}), ` + (chiSost ? `sostituito da ${first(chiSost)}` : "nessun sostituto disponibile") });
+    const risposta = chiSost
+      ? `✅ Ok ${first(chi)}, domenica ${breveDi(f.ds)} (${quando}) ti sostituisce ${first(chiSost)}. Turni aggiornati nel gestionale.`
+      : `⚠️ Ok ${first(chi)}, ma per domenica ${breveDi(f.ds)} (${quando}) non c'è nessun sostituto disponibile. ${first(T.jolly)}, ci pensi tu?`;
+    const out = await invia(env.GREEN_CHAT, risposta, md.idMessage || ev.idMessage);
     return json({ ok: true, cambio: f, inviato: out.ok });
   }
 
