@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ledwall">
+<meta name="theme-color" content="#0f1115">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-512.png">
+<link rel="manifest" href="manifest.json">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<title>Gestionale Ledwall – Inventario & Eventi</title>
+<style id="css">
+:root{--bg:#0f1115;--panel:#181b22;--panel2:#20242d;--line:#2c313c;--txt:#e8eaef;--mut:#9aa1ad;--acc:#4f8cff;--ok:#2fbf71;--warn:#f0a020;--bad:#e5484d}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);font-size:15px}
+header{padding-top:max(12px,env(safe-area-inset-top))!important;display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+header h1{font-size:18px;margin:0}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav button{background:transparent;border:1px solid var(--line);color:var(--txt);padding:7px 14px;border-radius:8px;cursor:pointer}
+nav button.on{background:var(--acc);border-color:var(--acc)}
+main{max-width:1200px;margin:0 auto;padding:20px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.card h2{margin:0 0 12px;font-size:17px}
+.card h3{margin:14px 0 8px;font-size:15px;color:var(--mut)}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--mut);font-weight:500;font-size:13px}
+input,select,textarea{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:7px 9px;border-radius:7px;font:inherit;width:100%}
+textarea{min-height:60px}
+label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
+.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+.btn{background:var(--acc);border:0;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit}
+.btn.sec{background:var(--panel2);border:1px solid var(--line)}
+.btn.bad{background:var(--bad);color:#fff}
+.btn.sm{padding:4px 9px;font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sp{flex:1}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;background:var(--panel2);border:1px solid var(--line)}
+.ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+.tag.ok{border-color:var(--ok)} .tag.bad{border-color:var(--bad)} .tag.warn{border-color:var(--warn)}
+.mut{color:var(--mut);font-size:13px}
+.kpi{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:10px 0}
+.kpi div{background:var(--panel2);border-radius:10px;padding:10px}
+.kpi b{display:block;font-size:20px}
+.kpi span{color:var(--mut);font-size:12px}
+.screen{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+.preview{display:grid;gap:2px;margin-top:10px;max-width:100%;overflow:auto}
+.preview i{display:block;background:#2a4f8f;border-radius:2px}
+.evlist .ev{display:flex;gap:12px;align-items:center;padding:10px;border-bottom:1px solid var(--line);cursor:pointer}
+.evlist .ev:hover{background:var(--panel2)}
+.check td:first-child{width:30px}
+.check input{width:18px;height:18px}
+#saveSt{font-size:12px;color:var(--mut)}
+#dlg{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:20;padding:20px}
+#dlg>div{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;max-width:380px;width:100%}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;display:none;z-index:30}
+#login{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:40;padding:20px}
+#login form{max-width:360px;width:100%}
+#login input{margin-bottom:10px}
+.pres{position:absolute;top:-6px;right:-4px;min-width:22px;height:22px;border-radius:11px;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid var(--panel);z-index:3;pointer-events:none}
+.hasPres{position:relative}
+.presOn{outline:2px solid var(--pc);outline-offset:1px}
+.av{display:inline-flex;width:26px;height:26px;border-radius:13px;color:#fff;font-size:11px;font-weight:700;align-items:center;justify-content:center;margin-left:-6px;border:2px solid var(--panel)}
+#online{display:flex;padding-left:6px}
+.by{font-size:11px;color:var(--mut);margin-top:4px}
+.log{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);align-items:flex-start}
+.log .av{margin:0;flex:none}
+.done td{text-decoration:line-through;color:var(--mut)}
+@media print{
+  header,nav,.noprint{display:none!important}
+  body{background:#fff;color:#000}
+  .card{border:1px solid #999;background:#fff}
+  .screen,.kpi div{background:#f3f3f3}
+  input,select,textarea{background:#fff;color:#000;border:1px solid #999}
+}
+</style>
+</head>
+<body>
+<div id="shell">
+<header>
+  <h1>🎛️ Gestionale Ledwall</h1>
+  <nav id="nav">
+    <button data-v="eventi">Eventi</button>
+    <button data-v="inventario">Inventario</button>
+    <button data-v="calendario">Calendario</button>
+    <button data-v="registro">Registro</button>
+    <button data-v="backup">Backup</button>
+  </nav>
+  <span class="sp"></span><span id="online"></span><span id="saveSt"></span><button class="btn sec sm" id="pwbtn" style="display:none">👤 Profilo</button><button class="btn sec sm" id="logout" style="display:none">Esci</button>
+</header>
+<main id="app"></main>
+<div id="dlg"><div><p id="dlgTxt"></p><div class="row"><span class="sp"></span><button class="btn sec" id="dlgNo">Annulla</button><button class="btn bad" id="dlgYes">Conferma</button></div></div></div>
+<div id="toast"></div>
+<div id="pwdlg" style="position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:45;padding:20px"><form class="card" id="pwForm" style="max-width:360px;width:100%"><h2>Profilo</h2>
+<label>Il tuo nome (lo vedono gli altri)</label><input id="pwName" maxlength="30" required>
+<label>Nuova password (lascia vuoto per non cambiarla)</label><input type="password" id="pw1" autocomplete="new-password" minlength="8">
+<div class="row" style="margin-top:10px"><span class="sp"></span><button type="button" class="btn sec" id="pwNo">Annulla</button><button class="btn">Salva</button></div><p class="mut" id="pwErr"></p></form></div>
+<div id="login"><form class="card" id="loginForm"><h2>🎛️ Gestionale Ledwall</h2>
+<label>Email</label><input type="email" id="lEmail" autocomplete="username" required>
+<label>Password</label><input type="password" id="lPass" autocomplete="current-password" required>
+<button class="btn" style="width:100%">Accedi</button><p class="mut" id="lErr"></p></form></div>
+</div>
+
+<script id="appjs">
+/* ===================== DATI ===================== */
+const KEY='gestionale-ledwall-v1';
+const CATS={led:'Casse LED',processore:'Processori / Controller',cavo:'Cavi',struttura:'Strutture / Appendimento',audio:'Audio / Video',altro:'Altro'};
+const PER={none:'—',modulo:'per modulo',colonna:'per colonna',fila:'per fila',cassa:'per cassa LED',schermo:'per schermo',evento:'per evento'};
+const uid=()=>Math.random().toString(36).slice(2,10);
+
+function seed(){
+  const led=uid();
+  return {
+    settings:{scorta:5},
+    items:[
+      {id:led,cat:'led',name:'Modulo P2.6 192x384 (cassa da 6)',qty:20,modPerCase:6,modW:500,modH:1000,pxW:192,pxH:384,kg:7.5,watt:180,autoPer:'none',autoQty:0,note:'Esempio: correggi misure, moduli per cassa e quantità'},
+      {id:uid(),cat:'processore',name:'Processore video (es. Novastar)',qty:2,autoPer:'schermo',autoQty:1,maxPx:2300000,note:'maxPx = pixel gestibili'},
+      {id:uid(),cat:'cavo',name:'Cavo alimentazione modulo-modulo',qty:150,autoPer:'modulo',autoQty:1,note:''},
+      {id:uid(),cat:'cavo',name:'Cavo rete dati (RJ45) modulo-modulo',qty:150,autoPer:'modulo',autoQty:1,note:''},
+      {id:uid(),cat:'cavo',name:'Cavo powerCON / Schuko alimentazione colonna',qty:40,autoPer:'colonna',autoQty:1,note:''},
+      {id:uid(),cat:'cavo',name:'Cavo Cat6 lungo (processore → schermo) 30m',qty:8,autoPer:'schermo',autoQty:2,note:''},
+      {id:uid(),cat:'struttura',name:'Barra di appendimento 1m',qty:20,autoPer:'colonna',autoQty:1,note:'1 per colonna (modulo 500mm → 1 barra ogni 2 colonne? correggi)'},
+      {id:uid(),cat:'altro',name:'Multipresa / quadretto elettrico',qty:4,autoPer:'schermo',autoQty:1,note:''},
+    ],
+    events:[]
+  };
+}
+const CFG=window.CONFIG||{};
+let sb=null; try{if(CFG.SUPABASE_URL&&!/INCOLLA/.test(CFG.SUPABASE_URL))sb=supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_KEY)}catch(e){console.error(e)}
+function localLoad(){try{const d=JSON.parse(localStorage.getItem(KEY));return d&&d.items?d:null}catch(e){return null}}
+let DB=localLoad()||seed();
+const IN_FRAME=false;
+let pubTimer=null, dirty=false, USER=null;
+function setSt(t){const e=document.getElementById('saveSt');if(e)e.textContent=t}
+function save(){
+  DB._t=Date.now();
+  try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){}
+  try{sessionStorage.setItem(KEY+'-ui',JSON.stringify({view,curEv}))}catch(e){}
+  if(USER){dirty=true;setSt('Salvataggio…');clearTimeout(pubTimer);pubTimer=setTimeout(push,1000)}
+}
+// Dati condivisi tra tutti gli utenti: una sola riga 'main' nella tabella 'condiviso'
+let BASE_T=null; // _t della versione online su cui stiamo lavorando
+async function remote(){const {data,error}=await sb.from('condiviso').select('data').eq('id','main').maybeSingle();if(error)throw error;return data&&data.data}
+async function push(){
+  if(!USER||!dirty)return; dirty=false;
+  try{
+    const r=await remote();
+    if(r&&r.items&&BASE_T!==null&&(r._t||0)>BASE_T){ // qualcun altro ha salvato nel frattempo
+      LOGQ=[];DB=r;BASE_T=r._t||0;try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){};render();
+      toast('Un altro utente ha modificato i dati: ho caricato la versione aggiornata, ripeti la tua ultima modifica');setSt('Sincronizzato ✓');return}
+    const {error}=await sb.from('condiviso').upsert({id:'main',data:DB,updated_at:new Date().toISOString(),updated_by:USER.id});
+    if(error)throw error; BASE_T=DB._t; setSt('Salvato ✓'); flushLog();
+  }catch(e){dirty=true;setSt('⚠️ Non salvato online');console.error(e)}
+}
+async function pull(){
+  if(!USER||dirty)return;
+  let r; try{r=await remote()}catch(e){setSt('⚠️ Offline: salvo sul dispositivo');console.error(e);return}
+  if(r&&r.items){ if(BASE_T===null||(r._t||0)!==BASE_T||(r._t||0)!==(DB._t||0)){const ui=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#app');DB=r;BASE_T=r._t||0;try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){};if(!ui)render()} setSt('Sincronizzato ✓')}
+  else{BASE_T=DB._t||0;dirty=true;await push()}
+}
+setInterval(()=>{if(document.visibilityState==='visible')pull()},30000);
+async function changePw(){
+  const d=document.getElementById('pwdlg');d.style.display='flex';document.getElementById('pw1').value='';document.getElementById('pwName').value=myName();document.getElementById('pwErr').textContent='';
+}
+/* ===================== COLLABORAZIONE ===================== */
+function myName(){return (USER&&USER.user_metadata&&USER.user_metadata.nome)||(USER&&USER.email?USER.email.split('@')[0]:'Io')}
+function initials(n){const p=String(n||'?').trim().split(/\s+/);return ((p[0]||'?')[0]+(p[1]?p[1][0]:'')).toUpperCase()}
+function colorOf(id){let h=0;for(const c of String(id))h=(h*31+c.charCodeAt(0))%360;return `hsl(${h},65%,45%)`}
+function ago(iso){if(!iso)return '';const m=Math.round((Date.now()-new Date(iso))/60000);if(m<1)return 'adesso';if(m<60)return m+' min fa';const h=Math.round(m/60);if(h<24)return h+' h fa';return new Date(iso).toLocaleDateString('it-IT',{day:'2-digit',month:'short'})+' '+new Date(iso).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}
+let LOGQ=[];
+function logChange(txt){LOGQ.push(txt)}
+function stamp(o){if(o){o._by=myName();o._at=new Date().toISOString()}}
+function byLine(o){return o&&o._by?`<div class="by">✏️ ${esc(o._by)} · ${ago(o._at)}</div>`:''}
+async function flushLog(){if(!USER||!LOGQ.length)return;const rows=LOGQ.map(t=>({user_id:USER.id,nome:myName(),testo:t}));LOGQ=[];const {error}=await sb.from('registro').insert(rows);if(error)console.error(error)}
+let CH=null, PRES={}, MYFOCUS=null;
+function keyOf(el){
+  if(!el||!el.dataset)return null;
+  if(el.dataset.f){const w=el.closest('[data-item]');return w&&('i:'+w.dataset.item+':'+el.dataset.f)}
+  if(el.dataset.ef)return 'e:'+curEv+':'+el.dataset.ef;
+  if(el.dataset.sf){const w=el.closest('[data-scr]');return w&&('e:'+curEv+':s'+w.dataset.scr+':'+el.dataset.sf)}
+  if(el.dataset.chk)return 'e:'+curEv+':c:'+el.dataset.chk;
+  return null;
+}
+function others(){const out=[];Object.values(PRES).forEach(arr=>arr.forEach(p=>{if(p.uid!==(USER&&USER.id)&&!out.find(o=>o.uid===p.uid))out.push(p)}));return out}
+function drawPresence(){
+  const ol=document.getElementById('online');
+  if(ol){const o=others();ol.innerHTML=o.map(p=>`<span class="av" title="${esc(p.nome)} è online" style="background:${p.colore}">${esc(initials(p.nome))}</span>`).join('')}
+  document.querySelectorAll('#app .pres').forEach(x=>x.remove());
+  document.querySelectorAll('#app .presOn').forEach(x=>{x.classList.remove('presOn');x.title=''});
+  const byKey={};others().forEach(p=>{if(p.focus)(byKey[p.focus]=byKey[p.focus]||[]).push(p)});
+  if(!Object.keys(byKey).length)return;
+  document.querySelectorAll('#app [data-f],#app [data-ef],#app [data-sf],#app [data-chk]').forEach(el=>{
+    const k=keyOf(el), ps=k&&byKey[k]; if(!ps)return;
+    const box=el.parentElement; box.classList.add('hasPres');
+    el.classList.add('presOn'); el.style.setProperty('--pc',ps[0].colore); el.title=ps.map(p=>p.nome).join(', ')+' sta modificando';
+    const b=document.createElement('span');b.className='pres';b.style.background=ps[0].colore;b.textContent=initials(ps[0].nome)+(ps.length>1?'+':'');box.appendChild(b);
+  });
+}
+function track(){if(CH)CH.track({uid:USER.id,nome:myName(),colore:colorOf(USER.id),focus:MYFOCUS,view:curEv||view}).catch(()=>{})}
+function startRealtime(){
+  if(CH||!USER)return;
+  CH=sb.channel('gestionale',{config:{presence:{key:USER.id}}});
+  CH.on('presence',{event:'sync'},()=>{PRES=CH.presenceState();drawPresence()});
+  CH.on('postgres_changes',{event:'*',schema:'public',table:'condiviso'},pl=>{const r=pl.new&&pl.new.data;if(r&&r._t!==BASE_T)pull()});
+  CH.on('postgres_changes',{event:'INSERT',schema:'public',table:'registro'},pl=>{const r=pl.new;if(!r)return;
+    if(r.user_id!==USER.id)toast(`${r.nome}: ${r.testo}`);
+    if(view==='registro'&&!curEv)loadLog()});
+  CH.subscribe(st=>{if(st==='SUBSCRIBED')track()});
+  document.addEventListener('focusin',e=>{const k=keyOf(e.target);if(k!==MYFOCUS){MYFOCUS=k;track()}});
+  document.addEventListener('focusout',()=>{setTimeout(()=>{const k=keyOf(document.activeElement);if(k!==MYFOCUS){MYFOCUS=k;track()}},50)});
+}
+let LOGROWS=null;
+async function loadLog(){
+  if(!USER){return}
+  const {data,error}=await sb.from('registro').select('at,user_id,nome,testo').order('at',{ascending:false}).limit(300);
+  if(error){console.error(error);return}
+  LOGROWS=data; if(view==='registro'&&!curEv)render();
+}
+function vLog(){
+  if(LOGROWS===null){loadLog();return '<div class="card"><h2>Registro modifiche</h2><p class="mut">Caricamento…</p></div>'}
+  const q=(window.LOGQUERY||'').toLowerCase();
+  const rows=LOGROWS.filter(r=>!q||(r.testo+' '+r.nome).toLowerCase().includes(q));
+  return `<div class="card"><div class="row"><h2 style="margin:0">Registro modifiche</h2><span class="sp"></span><input id="logq" placeholder="Cerca (nome, evento, articolo…)" value="${esc(window.LOGQUERY||'')}" style="max-width:260px"></div>
+  <p class="mut">Ultime 300 modifiche di tutti gli utenti.</p>
+  ${rows.map(r=>`<div class="log"><span class="av" style="background:${colorOf(r.user_id)}">${esc(initials(r.nome))}</span><div><div><b>${esc(r.nome)}</b> <span class="mut">· ${ago(r.at)}</span></div><div>${esc(r.testo)}</div></div></div>`).join('')||'<p class="mut">Nessuna modifica registrata.</p>'}</div>`;
+}
+function ask(msg){return new Promise(res=>{const d=document.getElementById('dlg');document.getElementById('dlgTxt').textContent=msg;d.style.display='flex';
+  document.getElementById('dlgYes').onclick=()=>{d.style.display='none';res(true)};document.getElementById('dlgNo').onclick=()=>{d.style.display='none';res(false)}})}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',2500)}
+
+function showLogin(msg){document.getElementById('login').style.display='flex';document.getElementById('lErr').textContent=msg||''}
+async function start(){
+  render();
+  if(!sb){showLogin('Configurazione mancante: inserisci URL e chiave Supabase in config.js');return}
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){showLogin();return}
+  USER=session.user; document.getElementById('logout').style.display='';document.getElementById('pwbtn').style.display='';
+  await pull(); startRealtime();
+}
+document.getElementById('loginForm').onsubmit=async e=>{e.preventDefault();
+  if(!sb)return; document.getElementById('lErr').textContent='Accesso…';
+  const {error}=await sb.auth.signInWithPassword({email:document.getElementById('lEmail').value.trim(),password:document.getElementById('lPass').value});
+  if(error){document.getElementById('lErr').textContent='Email o password errati';return}
+  document.getElementById('login').style.display='none'; start();
+};
+document.getElementById('logout').onclick=async()=>{if(!await ask('Uscire dal gestionale su questo dispositivo?'))return;await push();await sb.auth.signOut();try{localStorage.removeItem(KEY)}catch(e){};location.reload()};
+document.getElementById('pwbtn').onclick=changePw;
+document.getElementById('pwNo').onclick=()=>document.getElementById('pwdlg').style.display='none';
+document.getElementById('pwForm').onsubmit=async e=>{e.preventDefault();const pw=document.getElementById('pw1').value, nome=document.getElementById('pwName').value.trim();
+  const upd={data:{nome}}; if(pw)upd.password=pw;
+  const {data,error}=await sb.auth.updateUser(upd);
+  if(error){document.getElementById('pwErr').textContent='Errore: '+(error.message||'riprova');return}
+  if(data&&data.user)USER=data.user; track();
+  document.getElementById('pwdlg').style.display='none';toast(pw?'Profilo e password aggiornati ✓':'Profilo aggiornato ✓')};
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')pull();else if(dirty)push()});
+
+const item=id=>DB.items.find(i=>i.id===id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtD=d=>d?new Date(d+'T00:00').toLocaleDateString('it-IT',{weekday:'short',day:'2-digit',month:'short',year:'numeric'}):'';
+
+/* ===================== CALCOLO ===================== */
+function screenCalc(s){
+  const it=item(s.ledId); if(!it) return null;
+  let cols,rows;
+  if(s.mode==='metri'){cols=Math.ceil((+s.w*1000)/it.modW-1e-9);rows=Math.ceil((+s.h*1000)/it.modH-1e-9)}
+  else{cols=Math.max(0,Math.round(+s.w));rows=Math.max(0,Math.round(+s.h))}
+  const mods=cols*rows;
+  const scorta=Math.ceil(mods*(+DB.settings.scorta||0)/100);
+  const modsTot=mods+scorta;
+  const cases=Math.ceil(modsTot/it.modPerCase);
+  return {it,cols,rows,mods,scorta,modsTot,cases,
+    leftover:cases*it.modPerCase-modsTot,
+    pxW:cols*it.pxW,pxH:rows*it.pxH,
+    mW:cols*it.modW/1000,mH:rows*it.modH/1000,
+    kg:mods*(+it.kg||0),watt:mods*(+it.watt||0)};
+}
+function overlap(a,b){return a.start<= (b.end||b.start) && b.start <= (a.end||a.start)}
+function usedElsewhere(ev,itemId){
+  // massimo impegno dello stesso materiale da altri eventi che si sovrappongono
+  let used=0;
+  DB.events.forEach(o=>{ if(o.id===ev.id||!ev.start||!o.start||!overlap(ev,o))return;
+    const n=needs(o)[itemId]; if(n) used+=n.qty; });
+  return used;
+}
+function needs(ev){
+  const need={}; const add=(id,q,why)=>{ if(!q)return; need[id]=need[id]||{qty:0,why:[]}; need[id].qty+=q; need[id].why.push(why)};
+  const calcs=(ev.screens||[]).map(screenCalc).filter(Boolean);
+  let totMods=0,totCols=0,totRows=0,totCases=0;
+  calcs.forEach((c,i)=>{const nm=ev.screens[i].name||('Schermo '+(i+1));
+    add(c.it.id,c.cases,`${nm}: ${c.modsTot} moduli → ${c.cases} casse`);
+    totMods+=c.mods;totCols+=c.cols;totRows+=c.rows;totCases+=c.cases;});
+  DB.items.forEach(it=>{ if(!it.autoPer||it.autoPer==='none'||!(+it.autoQty))return; const q=+it.autoQty;
+    if(it.autoPer==='modulo') add(it.id,Math.ceil(q*totMods),`${q} × ${totMods} moduli`);
+    if(it.autoPer==='colonna') add(it.id,Math.ceil(q*totCols),`${q} × ${totCols} colonne`);
+    if(it.autoPer==='fila') add(it.id,Math.ceil(q*totRows),`${q} × ${totRows} file`);
+    if(it.autoPer==='cassa') add(it.id,Math.ceil(q*totCases),`${q} × ${totCases} casse`);
+    if(it.autoPer==='schermo' && calcs.length){
+      if(it.cat==='processore' && +it.maxPx){ let n=0; calcs.forEach(c=>n+=Math.max(1,Math.ceil(c.pxW*c.pxH/+it.maxPx))*q); add(it.id,n,`in base ai pixel (max ${(+it.maxPx).toLocaleString('it-IT')} px)`); }
+      else add(it.id,Math.ceil(q*calcs.length),`${q} × ${calcs.length} schermi`);
+    }
+    if(it.autoPer==='evento') add(it.id,Math.ceil(q),'fisso per evento');
+  });
+  (ev.extras||[]).forEach(x=>add(x.itemId,+x.qty,'aggiunto a mano'));
+  return need;
+}
+
+/* ===================== VISTE ===================== */
+let view='eventi', curEv=null;
+try{const u=JSON.parse(sessionStorage.getItem(KEY+'-ui'));if(u){view=u.view||view;curEv=u.curEv||null}}catch(e){}
+document.getElementById('nav').onclick=e=>{const v=e.target.dataset.v;if(v){view=v;curEv=null;rememberUI();render()}};
+function rememberUI(){try{sessionStorage.setItem(KEY+'-ui',JSON.stringify({view,curEv}))}catch(e){}}
+function render(){
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===view));
+  const app=document.getElementById('app');
+  app.innerHTML = curEv? vEvent(curEv) : ({eventi:vEvents,inventario:vInv,calendario:vCal,registro:vLog,backup:vBackup}[view]||vEvents)();
+  bind(); drawPresence(); if(typeof track==='function'&&CH)track();
+}
+
+/* ---------- Inventario ---------- */
+function vInv(){
+  let h=`<div class="card"><div class="row"><h2 style="margin:0">Inventario</h2><span class="sp"></span>
+    <select id="newCat" style="width:auto">${Object.entries(CATS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select>
+    <button class="btn" data-act="addItem">+ Aggiungi</button></div>
+    <p class="mut">Le <b>regole automatiche</b> ("per modulo", "per colonna"...) servono a calcolare da sole cavi e accessori quando crei uno schermo in un evento.</p></div>`;
+  Object.entries(CATS).forEach(([cat,label])=>{
+    const its=DB.items.filter(i=>i.cat===cat); if(!its.length)return;
+    h+=`<div class="card"><h2>${label}</h2>`;
+    its.forEach(it=>{
+      h+=`<div class="screen" data-item="${it.id}"><div class="grid">
+        <div style="grid-column:span 2"><label>Nome</label><input data-f="name" value="${esc(it.name)}"></div>
+        <div><label>${cat==='led'?'Casse possedute':'Quantità'}</label><input type="number" min="0" data-f="qty" value="${it.qty}"></div>`;
+      if(cat==='led') h+=`
+        <div><label>Moduli per cassa</label><input type="number" min="1" data-f="modPerCase" value="${it.modPerCase}"></div>
+        <div><label>Modulo larg. (mm)</label><input type="number" data-f="modW" value="${it.modW}"></div>
+        <div><label>Modulo alt. (mm)</label><input type="number" data-f="modH" value="${it.modH}"></div>
+        <div><label>Pixel larg.</label><input type="number" data-f="pxW" value="${it.pxW}"></div>
+        <div><label>Pixel alt.</label><input type="number" data-f="pxH" value="${it.pxH}"></div>
+        <div><label>Peso modulo (kg)</label><input type="number" step="0.1" data-f="kg" value="${it.kg}"></div>
+        <div><label>Watt max modulo</label><input type="number" data-f="watt" value="${it.watt}"></div>
+        <div><label>Totale moduli</label><input disabled value="${(it.qty*it.modPerCase)}"></div>`;
+      else h+=`
+        <div><label>Regola automatica</label><select data-f="autoPer">${Object.entries(PER).map(([k,v])=>`<option value="${k}" ${it.autoPer===k?'selected':''}>${v}</option>`).join('')}</select></div>
+        <div><label>Quantità per regola</label><input type="number" step="0.1" data-f="autoQty" value="${it.autoQty||0}"></div>
+        ${cat==='processore'?`<div><label>Max pixel per unità</label><input type="number" data-f="maxPx" value="${it.maxPx||''}"></div>`:''}`;
+      h+=`<div style="grid-column:span 2"><label>Note</label><input data-f="note" value="${esc(it.note)}"></div>
+        <div style="align-self:end"><button class="btn bad sm" data-act="delItem" data-id="${it.id}">Elimina</button></div></div>${byLine(it)}</div>`;
+    });
+    h+='</div>';
+  });
+  return h;
+}
+
+/* ---------- Lista eventi ---------- */
+function vEvents(){
+  const today=new Date().toISOString().slice(0,10);
+  const evs=[...DB.events].sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+  const fut=evs.filter(e=>(e.end||e.start||'9')>=today), past=evs.filter(e=>(e.end||e.start||'9')<today);
+  const row=e=>{const st=status(e);return `<div class="ev" data-open="${e.id}"><div><b>${esc(e.name||'Senza nome')}</b><div class="mut">${fmtD(e.start)}${e.end&&e.end!==e.start?' → '+fmtD(e.end):''} ${e.place?'· '+esc(e.place):''}</div></div><span class="sp"></span><span class="tag ${st.cls}">${st.txt}</span></div>${e._by?`<div class="by" style="padding:0 10px 8px">✏️ ${esc(e._by)} · ${ago(e._at)}</div>`:''}`};
+  return `<div class="card"><div class="row"><h2 style="margin:0">Eventi</h2><span class="sp"></span><button class="btn" data-act="addEv">+ Nuovo evento</button></div></div>
+  <div class="card evlist"><h3 style="margin-top:0">Prossimi</h3>${fut.map(row).join('')||'<p class="mut">Nessun evento. Crea il primo con "+ Nuovo evento".</p>'}
+  ${past.length?`<h3>Passati</h3>${past.map(row).join('')}`:''}</div>`;
+}
+function status(ev){
+  const n=needs(ev); let miss=0;
+  Object.entries(n).forEach(([id,x])=>{const it=item(id); if(it && x.qty>it.qty-usedElsewhere(ev,id)) miss++});
+  if(!Object.keys(n).length) return {cls:'',txt:'Da compilare'};
+  return miss?{cls:'bad',txt:`${miss} mancanti`}:{cls:'ok',txt:'Materiale OK'};
+}
+
+/* ---------- Dettaglio evento ---------- */
+function vEvent(id){
+  const ev=DB.events.find(e=>e.id===id); if(!ev){curEv=null;return vEvents()}
+  const leds=DB.items.filter(i=>i.cat==='led');
+  let h=`<div class="row noprint" style="margin-bottom:12px"><button class="btn sec" data-act="back">← Eventi</button><span class="sp"></span>
+    <button class="btn sec" data-act="dupEv">Duplica</button>${IN_FRAME?'':'<button class="btn sec" onclick="window.print()">🖨️ Stampa</button>'}<button class="btn bad" data-act="delEv">Elimina</button></div>
+  <div class="card" data-ev="${ev.id}"><h2>Dati evento</h2>${byLine(ev)}<div class="grid">
+    <div style="grid-column:span 2"><label>Nome</label><input data-ef="name" value="${esc(ev.name)}"></div>
+    <div style="grid-column:span 2"><label>Luogo</label><input data-ef="place" value="${esc(ev.place)}"></div>
+    <div><label>Dal</label><input type="date" data-ef="start" value="${ev.start||''}"></div>
+    <div><label>Al (vuoto = 1 giorno)</label><input type="date" data-ef="end" value="${ev.end||''}"></div>
+    <div><label>Montaggio (data/ora)</label><input type="datetime-local" data-ef="setup" value="${ev.setup||''}"></div>
+    <div><label>Smontaggio (data/ora)</label><input type="datetime-local" data-ef="teardown" value="${ev.teardown||''}"></div>
+    <div style="grid-column:1/-1"><label>Note (referente, orari, accesso, corrente disponibile...)</label><textarea data-ef="notes">${esc(ev.notes)}</textarea></div>
+  </div></div>
+  <div class="card"><div class="row"><h2 style="margin:0">Schermi</h2><span class="sp"></span><button class="btn noprint" data-act="addScreen">+ Schermo</button></div>
+  <p class="mut">Scegli se le misure sono in <b>moduli</b> (es. 3×2 moduli) o in <b>metri</b> (es. 3×2 m, arrotondato per eccesso). Scorta moduli di riserva: <input type="number" min="0" id="scorta" value="${DB.settings.scorta}" style="width:70px;display:inline-block"> %</p>`;
+  (ev.screens||[]).forEach((s,i)=>{
+    const c=screenCalc(s);
+    h+=`<div class="screen" data-scr="${i}"><div class="grid">
+      <div><label>Nome</label><input data-sf="name" value="${esc(s.name)}"></div>
+      <div style="grid-column:span 2"><label>Tipo LED</label><select data-sf="ledId">${leds.map(l=>`<option value="${l.id}" ${s.ledId===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select></div>
+      <div><label>Unità</label><select data-sf="mode"><option value="moduli" ${s.mode!=='metri'?'selected':''}>moduli</option><option value="metri" ${s.mode==='metri'?'selected':''}>metri</option></select></div>
+      <div><label>Larghezza</label><input type="number" step="0.1" min="0" data-sf="w" value="${s.w}"></div>
+      <div><label>Altezza</label><input type="number" step="0.1" min="0" data-sf="h" value="${s.h}"></div>
+      <div style="align-self:end" class="noprint"><button class="btn bad sm" data-act="delScreen" data-i="${i}">Rimuovi</button></div></div>`;
+    if(c){ h+=`<div class="kpi">
+      <div><b>${c.cols} × ${c.rows}</b><span>moduli (col × file)</span></div>
+      <div><b>${c.cases}</b><span>casse da ${c.it.modPerCase} (${c.mods} moduli${c.scorta?` + ${c.scorta} scorta`:''}${c.leftover?`, ${c.leftover} posti liberi`:''})</span></div>
+      <div><b>${c.mW.toFixed(2)} × ${c.mH.toFixed(2)} m</b><span>misura reale</span></div>
+      <div><b>${c.pxW} × ${c.pxH}</b><span>risoluzione px (${(c.pxW*c.pxH/1e6).toFixed(2)} MP)</span></div>
+      <div><b>${c.kg.toFixed(0)} kg</b><span>peso moduli</span></div>
+      <div><b>${(c.watt/1000).toFixed(1)} kW</b><span>consumo max (~${Math.ceil(c.watt/230)} A a 230V)</span></div></div>`;
+      const sz=Math.max(6,Math.min(40,Math.floor(560/Math.max(c.cols,1))));
+      h+=`<div class="preview" style="grid-template-columns:repeat(${c.cols},${sz}px)">${Array(Math.min(c.mods,2000)).fill(`<i style="height:${sz*c.it.modH/c.it.modW}px"></i>`).join('')}</div>`;
+    } else h+=`<p class="bad">Aggiungi prima un tipo di cassa LED nell'inventario.</p>`;
+    h+='</div>';
+  });
+  h+=`</div>`;
+
+  // materiale
+  const n=needs(ev);
+  h+=`<div class="card"><div class="row"><h2 style="margin:0">Materiale necessario & checklist carico</h2><span class="sp"></span>
+    <select id="extraSel" class="noprint" style="width:auto">${DB.items.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select>
+    <input id="extraQty" class="noprint" type="number" value="1" min="1" style="width:70px"><button class="btn sec noprint" data-act="addExtra">+ Aggiungi a mano</button></div>
+    <table class="check"><tr><th>✓</th><th>Materiale</th><th>Serve</th><th>Disponibile</th><th>Stato</th><th>Calcolo</th></tr>`;
+  const keys=Object.keys(n).sort((a,b)=>Object.keys(CATS).indexOf(item(a)?.cat)-Object.keys(CATS).indexOf(item(b)?.cat));
+  keys.forEach(id=>{const it=item(id); if(!it)return; const x=n[id]; const other=usedElsewhere(ev,id); const avail=it.qty-other; const done=ev.checked?.[id];
+    h+=`<tr class="${done?'done':''}"><td><input type="checkbox" data-chk="${id}" ${done?'checked':''}></td><td>${esc(it.name)}<div class="mut">${CATS[it.cat]}</div></td>
+    <td><b>${x.qty}</b> ${it.cat==='led'?'casse':'pz'}</td><td>${avail}${other?` <span class="mut">(${other} impegnati in altri eventi)</span>`:''}</td>
+    <td>${x.qty<=avail?'<span class="tag ok">OK</span>':`<span class="tag bad">Mancano ${x.qty-avail}</span>`}</td><td class="mut">${x.why.map(esc).join('<br>')}</td></tr>`});
+  if(!keys.length) h+=`<tr><td colspan="6" class="mut">Aggiungi uno schermo per vedere il calcolo.</td></tr>`;
+  h+=`</table>`;
+  if((ev.extras||[]).length) h+=`<h3>Aggiunti a mano</h3>${ev.extras.map((x,i)=>`<span class="tag">${esc(item(x.itemId)?.name)} × ${x.qty} <a href="#" class="noprint" data-act="delExtra" data-i="${i}" style="color:var(--bad)">✕</a></span> `).join('')}`;
+  h+=`</div>`;
+  return h;
+}
+
+/* ---------- Calendario ---------- */
+/* ---------- Turni domenica ---------- */
+function nextSunday(){const d=new Date();d.setDate(d.getDate()+((7-d.getDay())%7));return d.toISOString().slice(0,10)}
+function turni(){if(!DB.turni)DB.turni={start:nextSunday(),persone:['Sebastian Costantin','Lucas Balcan','Matteo Ciurciun','Edoardo Hrincescu'],jolly:'Beniamin',slot:['Mattina','Sera'],override:{}};DB.turni.override=DB.turni.override||{};return DB.turni}
+function isSunday(ds){return new Date(ds+'T12:00').getDay()===0}
+function turno(ds,slot){const T=turni();const o=T.override[ds+':'+slot];if(o!==undefined)return o;
+  const P=T.persone.filter(Boolean);if(!P.length||!T.start||ds<T.start)return '';
+  const w=Math.round((new Date(ds+'T12:00')-new Date(T.start+'T12:00'))/(7*864e5));if(w<0)return '';
+  const k=w*2+slot,n=P.length,c=Math.floor(k/n);return P[(k+c)%n]}
+function first(n){return String(n||'').trim().split(/\s+/)[0]}
+function isMe(n){return USER&&n&&first(n).toLowerCase()===first(myName()).toLowerCase()}
+function sundays(k){const out=[];const d=new Date(nextSunday()+'T12:00');for(let i=0;i<k;i++){out.push(d.toISOString().slice(0,10));d.setDate(d.getDate()+7)}return out}
+function vTurni(){
+  const T=turni(), opts=[...T.persone,T.jolly].filter(Boolean);
+  const sel=(ds,sl)=>{const cur=turno(ds,sl), ov=T.override[ds+':'+sl]!==undefined;
+    return `<select data-turno="${ds}:${sl}" style="${isMe(cur)?'border-color:var(--ok);':''}${ov?'font-style:italic':''}"><option value="__auto" ${!ov?'selected':''}>Auto: ${esc(autoTurno(ds,sl)||'—')}</option>${opts.map(o=>`<option ${ov&&cur===o?'selected':''}>${esc(o)}</option>`).join('')}<option value="" ${ov&&cur===''?'selected':''}>Nessuno</option></select>`};
+  return `<div class="card"><div class="row"><h2 style="margin:0">⛪ Turni della domenica</h2><span class="sp"></span><button class="btn sec sm" data-act="toggleTset">⚙️ Impostazioni</button></div>
+  <p class="mut">Rotazione automatica tra ${T.persone.length} persone, ${esc(T.jolly)} è il jolly. Per cambiare un turno scegli un nome dal menu; "Auto" torna alla rotazione.</p>
+  ${window.TSET?`<div class="screen grid">
+    <div style="grid-column:span 2"><label>Persone in rotazione (una per riga, in ordine)</label><textarea data-tset="persone" rows="5">${esc(T.persone.join('\n'))}</textarea></div>
+    <div><label>Jolly</label><input data-tset="jolly" value="${esc(T.jolly)}"></div>
+    <div><label>Prima domenica della rotazione</label><input type="date" data-tset="start" value="${T.start}"></div>
+    <div><label>Nome turno 1</label><input data-tset="slot0" value="${esc(T.slot[0])}"></div>
+    <div><label>Nome turno 2</label><input data-tset="slot1" value="${esc(T.slot[1])}"></div></div>`:''}
+  <table><tr><th>Domenica</th><th>☀️ ${esc(T.slot[0])}</th><th>🌙 ${esc(T.slot[1])}</th></tr>
+  ${sundays(8).map(ds=>`<tr><td>${fmtD(ds)}</td><td>${sel(ds,0)}</td><td>${sel(ds,1)}</td></tr>`).join('')}</table></div>`;
+}
+function autoTurno(ds,slot){const T=turni();const o=T.override[ds+':'+slot];delete T.override[ds+':'+slot];const r=turno(ds,slot);if(o!==undefined)T.override[ds+':'+slot]=o;return r}
+function vCal(){
+  const base=new Date(); base.setDate(1);
+  let h=vTurni();
+  for(let m=0;m<3;m++){
+    const d=new Date(base.getFullYear(),base.getMonth()+m,1);
+    const y=d.getFullYear(),mo=d.getMonth(); const days=new Date(y,mo+1,0).getDate(); const off=(d.getDay()+6)%7;
+    h+=`<div class="card"><h2>${d.toLocaleDateString('it-IT',{month:'long',year:'numeric'})}</h2><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">`;
+    ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'].forEach(x=>h+=`<div class="mut" style="text-align:center">${x}</div>`);
+    for(let i=0;i<off;i++)h+='<div></div>';
+    for(let g=1;g<=days;g++){const ds=`${y}-${String(mo+1).padStart(2,'0')}-${String(g).padStart(2,'0')}`;
+      const evs=DB.events.filter(e=>e.start&&e.start<=ds&&ds<=(e.end||e.start));
+      const tu=isSunday(ds)?[0,1].map(sl=>{const n=turno(ds,sl);return n?`<div style="font-size:11px;margin-top:2px;${isMe(n)?'color:var(--ok);font-weight:700':''}">${sl?'🌙':'☀️'} ${esc(first(n))}</div>`:''}).join(''):'';
+      h+=`<div style="background:var(--panel2);border-radius:6px;min-height:64px;padding:4px;font-size:12px"><div class="mut">${g}</div>${tu}${evs.map(e=>`<div data-open="${e.id}" style="background:var(--acc);border-radius:4px;padding:1px 4px;margin-top:2px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(e.name||'Evento')}</div>`).join('')}</div>`}
+    h+='</div></div>';
+  }
+  return h;
+}
+
+/* ---------- Backup ---------- */
+function vBackup(){
+  return `<div class="card"><h2>Backup dati</h2>
+  <p class="mut">I dati sono sincronizzati online sul tuo account. Puoi comunque esportare un backup (file .json) per sicurezza.</p>
+  <div class="row"><button class="btn" data-act="export">⬇️ Esporta backup</button>
+  <label class="btn sec" style="margin:0;color:var(--txt);font-size:15px">⬆️ Importa backup<input type="file" id="imp" accept=".json" hidden></label>
+  <span class="sp"></span><button class="btn bad" data-act="reset">Ripristina dati di esempio</button></div></div>`;
+}
+
+/* ===================== EVENTI UI ===================== */
+function bind(){
+  const app=document.getElementById('app');
+  app.onclick=async e=>{
+    const o=e.target.closest('[data-open]'); if(o){curEv=o.dataset.open;rememberUI();render();return}
+    const a=e.target.closest('[data-act]'); if(!a)return; const act=a.dataset.act;
+    const ev=curEv&&DB.events.find(x=>x.id===curEv);
+    const A={
+      addItem(){const cat=document.getElementById('newCat').value; const it={id:uid(),cat,name:'Nuovo articolo',qty:0,autoPer:'none',autoQty:0,note:''};
+        if(cat==='led')Object.assign(it,{name:'Nuovo modulo LED',modPerCase:6,modW:500,modH:1000,pxW:192,pxH:384,kg:7.5,watt:180});
+        stamp(it);DB.items.unshift(it);logChange(`Aggiunto articolo in ${CATS[cat]}`)},
+      async delItem(){const it=item(a.dataset.id);if(await ask('Eliminare questo articolo?')){DB.items=DB.items.filter(i=>i.id!==a.dataset.id);logChange(`Eliminato articolo "${it&&it.name}"`)}else return 'nosave'},
+      addEv(){const t=new Date().toISOString().slice(0,10);const n={id:uid(),name:'Nuovo evento',place:'',start:t,end:'',screens:[],extras:[],checked:{}};stamp(n);DB.events.push(n);curEv=n.id;logChange('Creato un nuovo evento')},
+      back(){curEv=null;view='eventi';rememberUI();render();return 'nosave'},
+      async delEv(){if(await ask('Eliminare l\'evento?')){logChange(`Eliminato evento "${ev.name}"`);DB.events=DB.events.filter(x=>x.id!==curEv);curEv=null}else return 'nosave'},
+      dupEv(){const c=JSON.parse(JSON.stringify(ev));c.id=uid();c.name+=' (copia)';c.checked={};stamp(c);DB.events.push(c);curEv=c.id;logChange(`Duplicato evento "${ev.name}"`)},
+      addScreen(){const l=DB.items.find(i=>i.cat==='led');ev.screens.push({name:'Schermo '+(ev.screens.length+1),ledId:l?.id,mode:'moduli',w:3,h:2});stamp(ev);logChange(`Evento "${ev.name}": aggiunto schermo`)},
+      delScreen(){const sc=ev.screens[+a.dataset.i];ev.screens.splice(+a.dataset.i,1);stamp(ev);logChange(`Evento "${ev.name}": rimosso ${sc&&sc.name}`)},
+      addExtra(){ev.extras=ev.extras||[];const x={itemId:document.getElementById('extraSel').value,qty:+document.getElementById('extraQty').value||1};ev.extras.push(x);stamp(ev);logChange(`Evento "${ev.name}": aggiunto a mano ${x.qty} × ${item(x.itemId)?.name}`)},
+      delExtra(){const x=ev.extras[+a.dataset.i];ev.extras.splice(+a.dataset.i,1);stamp(ev);logChange(`Evento "${ev.name}": tolto ${x&&item(x.itemId)?.name}`)},
+      async export(){const data=JSON.stringify(DB,null,2), filename='backup-gestionale-'+new Date().toISOString().slice(0,10)+'.json';
+        let dl=null; try{if(window.claude&&window.claude.use)dl=await window.claude.use('downloads')}catch(_){}
+        if(dl){try{await dl.save({filename,data});toast('Backup salvato')}catch(_){toast('Download annullato')}}
+        else{const b=new Blob([data],{type:'application/json'});const u=document.createElement('a');u.href=URL.createObjectURL(b);u.download=filename;u.click()}
+        return 'nosave'},
+      toggleTset(){window.TSET=!window.TSET;render();return 'nosave'},
+      async reset(){if(await ask('Cancellare tutto e ripristinare i dati di esempio? Vale per tutti gli utenti.')){DB=seed();logChange('Ripristinati i dati di esempio (tutto cancellato)')}else return 'nosave'},
+    };
+    if(A[act]){ if(act==='delExtra')e.preventDefault(); const r=await A[act](); if(r!=='nosave'){save();render()} }
+  };
+  app.onchange=e=>{
+    const t=e.target, ev=curEv&&DB.events.find(x=>x.id===curEv);
+    if(t.id==='logq'){window.LOGQUERY=t.value;render();return}
+    if(t.dataset.turno){const T=turni();const [ds,sl]=t.dataset.turno.split(':');const k=ds+':'+sl;const old=turno(ds,+sl);
+      if(t.value==='__auto')delete T.override[k];else T.override[k]=t.value;
+      logChange(`Turno ${T.slot[+sl]} di ${fmtD(ds)}: ${old||'nessuno'} → ${turno(ds,+sl)||'nessuno'}`);save();render();return}
+    if(t.dataset.tset){const T=turni();const f=t.dataset.tset;
+      if(f==='persone')T.persone=t.value.split('\n').map(x=>x.trim()).filter(Boolean);
+      else if(f==='slot0')T.slot[0]=t.value;else if(f==='slot1')T.slot[1]=t.value;else T[f]=t.value;
+      logChange(`Turni: modificate le impostazioni (${t.parentElement.querySelector('label').textContent})`);save();render();return}
+    const lab=()=>{const l=t.parentElement&&t.parentElement.querySelector('label');return l?l.textContent:''};
+    const show=(f,v)=>{if(f==='ledId')return item(v)?.name||v;if(f==='autoPer')return PER[v]||v;return v===''||v==null?'(vuoto)':v};
+    if(t.id==='imp'){const f=t.files[0];if(!f)return;f.text().then(s=>{try{const d=JSON.parse(s);if(!d.items)throw 0;DB=d;logChange('Importato un backup (sostituiti tutti i dati)');save();toast('Backup importato');render()}catch(_){toast('File non valido')}});return}
+    if(t.id==='scorta'){const old=DB.settings.scorta;DB.settings.scorta=+t.value||0;logChange(`Scorta moduli: ${old}% → ${DB.settings.scorta}%`)}
+    else if(t.dataset.f){const it=item(t.closest('[data-item]').dataset.item); const old=it[t.dataset.f]; it[t.dataset.f]=t.type==='number'?+t.value:t.value; stamp(it);
+      logChange(t.dataset.f==='name'?`Inventario: rinominato "${old}" → "${it.name}"`:`Inventario "${it.name}": ${lab()} ${show(t.dataset.f,old)} → ${show(t.dataset.f,it[t.dataset.f])}`)}
+    else if(t.dataset.ef){const old=ev[t.dataset.ef]; ev[t.dataset.ef]=t.value; if(t.dataset.ef==='end'&&t.value&&t.value<ev.start){ev.end=ev.start} stamp(ev);
+      logChange(t.dataset.ef==='name'?`Evento rinominato "${old}" → "${ev.name}"`:t.dataset.ef==='notes'?`Evento "${ev.name}": modificate le note`:`Evento "${ev.name}": ${lab()} ${show('',old)} → ${show('',ev[t.dataset.ef])}`)}
+    else if(t.dataset.sf){const s=ev.screens[+t.closest('[data-scr]').dataset.scr]; const old=s[t.dataset.sf]; s[t.dataset.sf]=t.type==='number'?+t.value:t.value; stamp(ev);
+      logChange(`Evento "${ev.name}", ${s.name}: ${lab()} ${show(t.dataset.sf,old)} → ${show(t.dataset.sf,s[t.dataset.sf])}`)}
+    else if(t.dataset.chk){ev.checked=ev.checked||{};ev.checked[t.dataset.chk]=t.checked; logChange(`Evento "${ev.name}": ${t.checked?'caricato ✓':'tolta la spunta a'} "${item(t.dataset.chk)?.name}"`)}
+    else return;
+    save(); render();
+  };
+}
+start();
+</script>
+</body>
+</html>
