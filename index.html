@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ledwall">
-<meta name="theme-color" content="#0f1115">
+<meta name="theme-color" content="#09090d">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-512.png">
 <link rel="manifest" href="manifest.json">
@@ -91,14 +91,68 @@ label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
 .ro{width:100%;border-collapse:collapse}.ro td{padding:9px 4px;border-top:1px solid #ffffff14;vertical-align:top}
 .dategrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.dategrid>div{min-width:0}
 .dategrid input[type=date]{-webkit-appearance:none;appearance:none;width:100%;min-width:0;box-sizing:border-box;display:block;text-align:left;height:44px}
+/* ===== Tema 2026: minimal, scuro, accento lavanda ===== */
+:root{--bg:#09090d;--panel:#121218;--panel2:#1a1a22;--line:#ffffff12;--txt:#f3f3f6;--mut:#8b8b98;--acc:#8b7cff;--acc2:#5fb4ff;--ok:#3ddc97;--warn:#ffb547;--bad:#ff5c6c;--r:18px}
+html,body{overflow-x:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;font-size:15px;letter-spacing:-.01em;background:radial-gradient(1200px 600px at 10% -10%,#8b7cff1f,transparent 60%),radial-gradient(900px 500px at 110% 0%,#5fb4ff14,transparent 60%),var(--bg);background-attachment:fixed;min-height:100vh;-webkit-font-smoothing:antialiased}
+header{background:#09090dcc;-webkit-backdrop-filter:saturate(160%) blur(18px);backdrop-filter:saturate(160%) blur(18px);border-bottom:1px solid var(--line);padding:10px 18px;gap:10px 14px}
+header h1{font-size:17px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+header h1 .logo{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:inline-grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:5px}
+header h1 .logo i{background:#fff;border-radius:1.5px;opacity:.9}
+nav{order:3;width:100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:4px;margin:0 -4px;padding:2px 4px}
+nav::-webkit-scrollbar{display:none}
+nav button{border:0;background:transparent;color:var(--mut);padding:7px 13px;border-radius:999px;font:inherit;font-size:14px;font-weight:500;white-space:nowrap;flex:none;transition:.15s}
+nav button:hover{color:var(--txt);background:#ffffff0a}
+nav button.on{background:var(--txt);color:#09090d}
+main{max-width:1100px;padding:18px 16px 60px}
+.card{background:linear-gradient(180deg,#ffffff08,#ffffff03);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:14px;box-shadow:0 1px 0 #ffffff08 inset}
+.card h2{font-size:18px;font-weight:700;letter-spacing:-.02em}
+input,select,textarea{background:#ffffff0a;border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--txt);transition:border-color .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc)}
+.btn{background:var(--acc);border-radius:12px;padding:10px 16px;font-weight:600;transition:transform .1s,opacity .15s}
+.btn:active{transform:scale(.97)}
+.btn.sec{background:#ffffff0d;border:1px solid var(--line);color:var(--txt)}
+.btn.sm{padding:6px 11px;border-radius:10px;font-size:13px}
+.tag{border-radius:999px;background:#ffffff0a}
+th,td{border-bottom:1px solid var(--line)}
+.calcell{min-width:0;overflow:hidden;background:#ffffff05;border:1px solid #ffffff08;border-radius:12px;min-height:70px;padding:6px}
+.calcell .cnum{font-size:12px;font-weight:600;color:var(--mut);display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;border-radius:11px}
+.calcell.today{outline:0;border-color:#8b7cff66;background:#8b7cff14}
+.calcell.today .cnum{background:var(--acc);color:#fff}
+.calcell.dom .cnum{color:var(--txt)}
+.chip{background:linear-gradient(90deg,var(--acc),#a493ff);color:#fff;border-radius:6px;padding:2px 6px;margin-top:3px;font-size:11px;font-weight:600;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.dav{box-shadow:0 2px 8px #0006}
+#toast{background:#1d1d26ee;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-radius:14px;padding:12px 18px;font-weight:500}
+#login{background:radial-gradient(800px 500px at 50% 0%,#8b7cff26,transparent 70%),var(--bg)}
+.task{border-bottom:1px solid var(--line);padding:11px 0}
+.task:last-child{border-bottom:0}
+.task input[type=checkbox]{appearance:none;-webkit-appearance:none;width:22px;height:22px;border-radius:7px;border:1.5px solid #ffffff40;background:transparent;padding:0;display:grid;place-content:center;cursor:pointer}
+.task input[type=checkbox]:checked{background:var(--ok);border-color:var(--ok)}
+.task input[type=checkbox]:checked::after{content:'✓';color:#09090d;font-weight:800;font-size:13px}
+/* home */
+.hello{margin:6px 2px 18px}.hello h2{font-size:30px;font-weight:800;letter-spacing:-.035em;margin:0}.hello p{margin:4px 0 0;color:var(--mut)}
+.hgrid{display:grid;gap:14px;grid-template-columns:1fr}
+@media(min-width:900px){.hgrid{grid-template-columns:1.6fr 1fr;align-items:start}.hgrid .wide{grid-column:1;grid-row:1/span 3}}
+.hgrid .card{margin:0}
+.eyebrow{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.hero{position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:-40% -20% auto auto;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,var(--hc,#8b7cff)55,transparent 70%);opacity:.35;pointer-events:none}
+.bigav{width:56px;height:56px;border-radius:28px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:19px;color:#fff;flex:none;box-shadow:0 6px 20px #0008}
+.hero .who{font-size:24px;font-weight:800;letter-spacing:-.03em}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:#ffffff0d;font-size:12px;font-weight:600;color:var(--txt)}
+.pill.me{background:#3ddc9722;color:var(--ok)}
+.evbig{cursor:pointer}.evbig .t{font-size:20px;font-weight:700;letter-spacing:-.02em}
+.count{font-size:40px;font-weight:800;letter-spacing:-.04em;line-height:1;background:linear-gradient(135deg,#fff,#b9b0ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.link{color:var(--acc);font-size:13px;font-weight:600;cursor:pointer;background:none;border:0;padding:0;font-family:inherit}
+@media(max-width:600px){.calcell{min-height:58px;padding:3px;border-radius:10px}.chip{font-size:9px;padding:1px 3px;border-radius:4px}.card{padding:14px}.hello h2{font-size:26px}}
 </style>
 </head>
 <body>
 <div id="shell">
 <header>
-  <h1>🎛️ Gestionale Ledwall</h1>
+  <h1><span class="logo"><i></i><i></i><i></i><i></i><i></i><i></i></span>Ledwall</h1>
   <nav id="nav">
-    <button data-v="calendario">Calendario</button>
+    <button data-v="calendario">Home</button>
     <button data-v="eventi">Eventi</button>
     <button data-v="turni">Turni</button>
     <button data-v="task">Task</button>
@@ -343,7 +397,7 @@ function render(){
   document.querySelectorAll('#nav button').forEach(b=>{b.classList.toggle('on',b.dataset.v===view);b.style.display=(adm||VISTE_UTENTE.includes(b.dataset.v))?'':'none'});
   const app=document.getElementById('app');
   app.innerHTML = (ANTEPRIMA&&realAdmin()?`<div class="card" style="border:1px solid var(--acc)"><div class="row"><b>👁 Anteprima: vedi il sito come Lucas, Matteo ed Edo</b><span class="sp"></span><button class="btn sm" data-ante="0">Esci dall'anteprima</button></div></div>`:'')
-    + (curEv? vEvent(curEv) : ({eventi:vEvents,inventario:adm?vInv:vInvRO,assenze:vAssenze,calendario:vCal,registro:vLog,backup:adm?vBackup:vWidget,task:vTask,turni:vTurni}[view]||vCal)());
+    + (curEv? vEvent(curEv) : ({eventi:vEvents,inventario:adm?vInv:vInvRO,assenze:vAssenze,calendario:vHome,registro:vLog,backup:adm?vBackup:vWidget,task:vTask,turni:vTurni}[view]||vCal)());
   bind(); drawPresence(); if(typeof track==='function'&&CH)track();
 }
 
@@ -515,9 +569,9 @@ function vCal(){
     const evs=isAdmin()?DB.events.filter(e=>e.start&&e.start<=ds&&ds<=(e.end||e.start)):[];
     const tu=isSunday(ds)?davDay(ds):'';
     const tk=isAdmin()?(DB.tasks||[]).filter(x=>x.scadenza===ds&&!x.fatto).length:0;
-    return `<div class="calcell${ds===oggi?' today':''}"${extra?' style="opacity:.4"':''}><div class="mut">${d.getDate()}${extra&&d.getDate()===1?' '+d.toLocaleDateString('it-IT',{month:'short'}):''}${tk?` <span title="${tk} task in scadenza">✅${tk>1?tk:''}</span>`:''}</div>${tu}${evs.map(e=>`<div data-open="${e.id}" style="background:var(--acc);border-radius:4px;padding:1px 4px;margin-top:2px;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(e.name||'Evento')}</div>`).join('')}</div>`};
-  let h=`<div class="card"><div class="row" style="margin-bottom:10px;flex-wrap:nowrap"><button class="btn sec sm" data-calm="-1" aria-label="Mese precedente">‹</button><h2 style="text-transform:capitalize;margin:0;flex:1;text-align:center">${base.toLocaleDateString('it-IT',{month:'long',year:'numeric'})}</h2>${CALOFF?'<button class="btn sec sm" data-calm="0">Oggi</button>':''}<button class="btn sec sm" data-calm="1" aria-label="Mese successivo">›</button></div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">`;
-  ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'].forEach(x=>h+=`<div class="mut" style="text-align:center">${x}</div>`);
+    return `<div class="calcell${ds===oggi?' today':''}${isSunday(ds)?' dom':''}"${extra?' style="opacity:.35"':''}><div><span class="cnum">${d.getDate()}</span>${extra&&d.getDate()===1?'<span class="mut"> '+d.toLocaleDateString('it-IT',{month:'short'})+'</span>':''}${tk?` <span title="${tk} task in scadenza" style="font-size:11px">✅${tk>1?tk:''}</span>`:''}</div>${tu}${evs.map(e=>`<div class="chip" data-open="${e.id}">${esc(e.name||'Evento')}</div>`).join('')}</div>`};
+  let h=`<div class="card"><div class="row" style="margin-bottom:10px;flex-wrap:nowrap"><button class="btn sec sm" data-calm="-1" aria-label="Mese precedente">‹</button><h2 style="text-transform:capitalize;margin:0;flex:1;text-align:center">${base.toLocaleDateString('it-IT',{month:'long',year:'numeric'})}</h2>${CALOFF?'<button class="btn sec sm" data-calm="0">Oggi</button>':''}<button class="btn sec sm" data-calm="1" aria-label="Mese successivo">›</button></div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px">`;
+  ['L','M','M','G','V','S','D'].forEach(x=>h+=`<div class="mut" style="text-align:center;font-size:11px;font-weight:600;letter-spacing:.06em">${x}</div>`);
   for(let i=0;i<off;i++)h+='<div></div>';
   for(let g=1;g<=days;g++)h+=cell(new Date(y,mo,g),false);
   // giorni del mese successivo fino alla domenica dopo la fine del mese
@@ -564,6 +618,30 @@ document.addEventListener('click',async e=>{
   if(!dal){toast('Scegli la data');return} if(al<dal){toast('La data finale è prima di quella iniziale');return}
   const {error}=await sb.from('blocchi').insert({nome,dal,al,nota});if(error){toast('Errore: '+error.message);return}
   toast('Assenza salvata ✓');await loadBlocchi();render()});
+/* ---------- Home ---------- */
+function vHome(){
+  const adm=isAdmin(), oggi=oggiS(), me=first(myName());
+  const ora=new Date().getHours(), saluto=ora<12?'Buongiorno':ora<18?'Ciao':'Buonasera';
+  const dataLunga=new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
+  const giorni=ds=>Math.round((new Date(ds+'T12:00')-new Date(oggi+'T12:00'))/864e5);
+  const quando=n=>n===0?'oggi':n===1?'domani':`tra ${n} giorni`;
+  // prossima domenica
+  const ds=sundays(1)[0], m=turno(ds,0), e=turno(ds,1), chi=m===e?m:[m,e].filter(Boolean).join(' / ');
+  const mio=[m,e].some(x=>x&&isMe(x));
+  const big=n=>`<span class="bigav" style="background:${pcol(n)}">${esc(initials(n))}</span>`;
+  const hero=`<div class="card hero" style="--hc:${m?pcol(m):'#8b7cff'}"><div class="eyebrow">⛪ Prossima domenica · ${new Date(ds+'T12:00').toLocaleDateString('it-IT',{day:'numeric',month:'long'})}</div>
+    ${chi?`<div class="row" style="gap:14px;flex-wrap:nowrap">${m===e?big(m):(m?big(m):'')+(e?big(e):'')}<div><div class="who">${esc(chi)}</div><div style="margin-top:6px" class="row">${mio?'<span class="pill me">✨ Tocca a te</span>':''}<span class="pill">${quando(giorni(ds))}</span>${m!==e?'<span class="pill">☀️ / 🌙 divisi</span>':''}</div></div></div>`:'<p class="mut">Nessun turno impostato.</p>'}
+    ${(()=>{const miei=sundays(12).filter(x=>x!==ds&&[turno(x,0),turno(x,1)].some(n=>n&&isMe(n)));return miei.length?`<div class="mut" style="margin-top:14px">I tuoi prossimi turni: ${miei.slice(0,3).map(x=>new Date(x+'T12:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'})).join(' · ')}</div>`:''})()}</div>`;
+  // prossimo evento
+  const ev=adm?[...DB.events].filter(x=>(x.end||x.start||'')>=oggi&&x.start).sort((a,b)=>a.start.localeCompare(b.start))[0]:null;
+  const evCard=adm?`<div class="card evbig"${ev?` data-open="${ev.id}"`:''}><div class="eyebrow">🎛️ Prossimo evento</div>${ev?`<div class="row" style="align-items:flex-end;flex-wrap:nowrap"><div style="flex:1;min-width:0"><div class="t">${esc(ev.name||'Evento')}</div><div class="mut" style="margin-top:4px">${fmtD(ev.start)}${ev.end&&ev.end!==ev.start?' → '+fmtD(ev.end):''}${ev.place?' · '+esc(ev.place):''}</div><div style="margin-top:10px"><span class="tag ${status(ev).cls}">${status(ev).txt}</span></div></div><div style="text-align:right">${giorni(ev.start)>0?`<div class="count">${giorni(ev.start)}</div><div class="mut">giorni</div>`:'<span class="pill me">In corso</span>'}</div></div>`:'<p class="mut" style="margin:0">Nessun evento in programma.</p><button class="link" data-act="addEv" style="margin-top:8px">+ Crea evento</button>'}</div>`:'';
+  // task
+  const tasks=adm?(DB.tasks||[]).filter(x=>!x.fatto).sort((a,b)=>(a.scadenza||'9').localeCompare(b.scadenza||'9')):[];
+  const tkCard=adm?`<div class="card"><div class="eyebrow">✅ Task <span class="sp"></span><button class="link" data-gov="task">Tutti →</button></div>${tasks.slice(0,5).map(x=>`<div class="task"><input type="checkbox" data-tdone="${x.id}"><div style="flex:1;min-width:0"><div class="tt">${esc(x.testo)}</div>${x.chi||x.scadenza?`<div class="mut">${x.chi?esc(x.chi):''}${x.chi&&x.scadenza?' · ':''}${x.scadenza?`<span class="${x.scadenza<oggi?'bad':''}">${new Date(x.scadenza+'T12:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</span>`:''}</div>`:''}</div></div>`).join('')||'<p class="mut" style="margin:0">Niente da fare 🎉</p>'}${tasks.length>5?`<div class="mut" style="margin-top:8px">+ altri ${tasks.length-5}</div>`:''}</div>`:'';
+  return `<div class="hello"><h2>${saluto}, ${esc(me)}</h2><p style="text-transform:capitalize">${dataLunga}</p></div>
+  <div class="hgrid">${hero}<div class="wide">${vCal()}</div>${evCard}${tkCard}</div>`;
+}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-gov]');if(!b)return;view=b.dataset.gov;curEv=null;rememberUI();render();scrollTo(0,0)});
 /* ---------- Task e checklist ---------- */
 function vTask(){
   DB.tasks=DB.tasks||[];DB.checklists=DB.checklists||[];
