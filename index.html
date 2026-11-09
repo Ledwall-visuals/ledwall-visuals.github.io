@@ -91,85 +91,106 @@ label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
 .ro{width:100%;border-collapse:collapse}.ro td{padding:9px 4px;border-top:1px solid #ffffff14;vertical-align:top}
 .dategrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.dategrid>div{min-width:0}
 .dategrid input[type=date]{-webkit-appearance:none;appearance:none;width:100%;min-width:0;box-sizing:border-box;display:block;text-align:left;height:44px}
-/* ===== Tema 2026: minimal, scuro, accento lavanda ===== */
-:root{--bg:#09090d;--panel:#121218;--panel2:#1a1a22;--line:#ffffff12;--txt:#f3f3f6;--mut:#8b8b98;--acc:#8b7cff;--acc2:#5fb4ff;--ok:#3ddc97;--warn:#ffb547;--bad:#ff5c6c;--r:18px}
+/* ===== Stile Apple (iOS dark, colori di sistema) ===== */
+:root{--bg:#000;--panel:#1c1c1e;--panel2:#2c2c2e;--panel3:#3a3a3c;--line:#38383a;--txt:#fff;--mut:#8e8e93;--acc:#0a84ff;--ok:#30d158;--warn:#ff9f0a;--bad:#ff453a;--r:14px}
 html,body{overflow-x:hidden}
-body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;font-size:15px;letter-spacing:-.01em;background:radial-gradient(1200px 600px at 10% -10%,#8b7cff1f,transparent 60%),radial-gradient(900px 500px at 110% 0%,#5fb4ff14,transparent 60%),var(--bg);background-attachment:fixed;min-height:100vh;-webkit-font-smoothing:antialiased}
-header{background:#09090dcc;-webkit-backdrop-filter:saturate(160%) blur(18px);backdrop-filter:saturate(160%) blur(18px);border-bottom:1px solid var(--line);padding:10px 18px;gap:10px 14px}
-header h1{font-size:17px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
-header h1 .logo{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:inline-grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:5px}
-header h1 .logo i{background:#fff;border-radius:1.5px;opacity:.9}
-nav{order:3;width:100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:4px;margin:0 -4px;padding:2px 4px}
-nav::-webkit-scrollbar{display:none}
-nav button{border:0;background:transparent;color:var(--mut);padding:7px 13px;border-radius:999px;font:inherit;font-size:14px;font-weight:500;white-space:nowrap;flex:none;transition:.15s}
-nav button:hover{color:var(--txt);background:#ffffff0a}
-nav button.on{background:var(--txt);color:#09090d}
-main{max-width:1100px;padding:18px 16px 60px}
-.card{background:linear-gradient(180deg,#ffffff08,#ffffff03);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:14px;box-shadow:0 1px 0 #ffffff08 inset}
-.card h2{font-size:18px;font-weight:700;letter-spacing:-.02em}
-input,select,textarea{background:#ffffff0a;border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--txt);transition:border-color .15s}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc)}
-.btn{background:var(--acc);border-radius:12px;padding:10px 16px;font-weight:600;transition:transform .1s,opacity .15s}
-.btn:active{transform:scale(.97)}
-.btn.sec{background:#ffffff0d;border:1px solid var(--line);color:var(--txt)}
-.btn.sm{padding:6px 11px;border-radius:10px;font-size:13px}
-.tag{border-radius:999px;background:#ffffff0a}
-th,td{border-bottom:1px solid var(--line)}
-.calcell{min-width:0;overflow:hidden;background:#ffffff05;border:1px solid #ffffff08;border-radius:12px;min-height:70px;padding:6px}
-.calcell .cnum{font-size:12px;font-weight:600;color:var(--mut);display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;border-radius:11px}
-.calcell.today{outline:0;border-color:#8b7cff66;background:#8b7cff14}
-.calcell.today .cnum{background:var(--acc);color:#fff}
-.calcell.dom .cnum{color:var(--txt)}
-.chip{background:linear-gradient(90deg,var(--acc),#a493ff);color:#fff;border-radius:6px;padding:2px 6px;margin-top:3px;font-size:11px;font-weight:600;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.dav{box-shadow:0 2px 8px #0006}
-#toast{background:#1d1d26ee;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-radius:14px;padding:12px 18px;font-weight:500}
-#login{background:radial-gradient(800px 500px at 50% 0%,#8b7cff26,transparent 70%),var(--bg)}
-.task{border-bottom:1px solid var(--line);padding:11px 0}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;font-size:17px;letter-spacing:-.02em;background:var(--bg);min-height:100vh;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+header{background:#000000b8;-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid var(--line);padding:8px 16px;gap:10px;flex-wrap:nowrap}
+header h1{font-size:17px;font-weight:600;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+header h1 .logo{width:24px;height:24px;border-radius:6px;background:linear-gradient(180deg,#5e5ce6,#0a84ff);display:inline-grid;grid-template-columns:repeat(3,1fr);gap:1.5px;padding:5px}
+header h1 .logo i{background:#fff;border-radius:1px}
+#saveSt{font-size:12px;color:var(--mut);white-space:nowrap}
+#logout{display:none!important}
+#pwbtn{width:32px;height:32px;border-radius:16px;padding:0;border:0;background:var(--panel3);color:#fff;font-size:13px;font-weight:600;flex:none}
+/* tab bar */
+nav{position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;justify-content:space-around;flex-wrap:nowrap;gap:0;background:#121212c7;-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+nav button{flex:1;max-width:110px;border:0;background:none;color:var(--mut);display:flex;flex-direction:column;align-items:center;gap:2px;font:inherit;font-size:10px;font-weight:500;letter-spacing:0;padding:4px 0;border-radius:0;cursor:pointer}
+nav button svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--acc);background:none}
+main{max-width:980px;padding:8px 16px calc(100px + env(safe-area-inset-bottom))}
+@media(min-width:900px){nav{position:sticky;top:48px;bottom:auto;justify-content:center;gap:4px;border-top:0;border-bottom:.5px solid var(--line);padding:6px}nav button{flex:none;flex-direction:row;font-size:14px;gap:6px;padding:6px 14px;border-radius:8px;max-width:none}nav button svg{width:18px;height:18px}nav button.on{background:var(--panel2);color:#fff}main{padding-bottom:60px}}
+.card{background:var(--panel);border:0;border-radius:var(--r);padding:16px;margin-bottom:16px;box-shadow:none}
+.card h2{font-size:20px;font-weight:700;letter-spacing:-.025em}
+.card h3{color:var(--mut);font-size:13px;font-weight:400;text-transform:uppercase;letter-spacing:0}
+input,select,textarea{background:var(--panel2);border:0;border-radius:10px;padding:11px 12px;color:var(--txt);font-size:17px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--acc);outline-offset:-2px}
+label{font-size:13px;color:var(--mut);margin:0 0 5px 4px}
+.btn{background:var(--acc);color:#fff;border-radius:12px;padding:11px 18px;font-weight:600;font-size:17px;transition:opacity .15s}
+.btn:active{opacity:.6}
+.btn.sec{background:var(--panel2);border:0;color:var(--acc)}
+.btn.bad{background:var(--panel2);color:var(--bad)}
+.btn.sm{padding:6px 12px;border-radius:999px;font-size:15px}
+.tag{border-radius:999px;background:var(--panel2);border:0;font-size:13px;padding:3px 10px}
+.tag.ok{color:var(--ok)}.tag.bad{color:var(--bad)}.tag.warn{color:var(--warn)}
+th,td{border-bottom:.5px solid var(--line)}
+.mut{color:var(--mut);font-size:15px}
+.screen{background:var(--panel2);border:0;border-radius:12px}
+.calcell{min-width:0;overflow:hidden;background:none;border:0;border-radius:10px;min-height:64px;padding:4px 2px;text-align:center}
+.calcell .cnum{font-size:15px;font-weight:400;color:var(--txt);display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:14px}
+.calcell.today{outline:0;background:none}
+.calcell.today .cnum{background:var(--bad);color:#fff;font-weight:600}
+.calcell .dav{margin:2px auto 0}
+.chip{background:#0a84ff33;color:#64b5ff;border-radius:4px;padding:1px 4px;margin-top:2px;font-size:11px;font-weight:600;text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.dav{box-shadow:none}
+#toast{background:#2c2c2ef2;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border:0;border-radius:14px;padding:12px 18px;font-weight:500;font-size:15px;bottom:calc(90px + env(safe-area-inset-bottom))}
+#dlg,#pwdlg{background:#0000008c!important;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#dlg>div,#pwdlg form{background:var(--panel)!important;border:0;border-radius:16px;box-shadow:0 20px 60px #000c}
+#login{background:var(--bg)}
+#login form{background:var(--panel)}
+.task{border-bottom:.5px solid var(--line);padding:11px 0}
 .task:last-child{border-bottom:0}
-.task input[type=checkbox]{appearance:none;-webkit-appearance:none;width:22px;height:22px;border-radius:7px;border:1.5px solid #ffffff40;background:transparent;padding:0;display:grid;place-content:center;cursor:pointer}
-.task input[type=checkbox]:checked{background:var(--ok);border-color:var(--ok)}
-.task input[type=checkbox]:checked::after{content:'✓';color:#09090d;font-weight:800;font-size:13px}
+.task input[type=checkbox]{appearance:none;-webkit-appearance:none;width:24px;height:24px;border-radius:12px;border:1.5px solid #636366;background:transparent;padding:0;display:grid;place-content:center;cursor:pointer;flex:none}
+.task input[type=checkbox]:checked{background:var(--acc);border-color:var(--acc)}
+.task input[type=checkbox]:checked::after{content:'';width:6px;height:11px;border:solid #fff;border-width:0 2px 2px 0;transform:translateY(-1px) rotate(45deg)}
 /* home */
-.hello{margin:6px 2px 18px}.hello h2{font-size:30px;font-weight:800;letter-spacing:-.035em;margin:0}.hello p{margin:4px 0 0;color:var(--mut)}
-.hgrid{display:grid;gap:14px;grid-template-columns:1fr}
-@media(min-width:900px){.hgrid{grid-template-columns:1.6fr 1fr;align-items:start}.hgrid .wide{grid-column:1;grid-row:1/span 3}}
+.hello{margin:12px 4px 16px}.hello h2{font-size:34px;font-weight:700;letter-spacing:-.035em;margin:0}.hello p{margin:2px 0 0;color:var(--mut);font-size:15px}
+.hgrid{display:grid;gap:16px;grid-template-columns:1fr}
+.hgrid .side{display:contents}.hgrid .hero{order:-1}
+@media(min-width:900px){.hgrid{grid-template-columns:1.5fr 1fr;align-items:start}.hgrid .side{display:flex;flex-direction:column;gap:16px}}
 .hgrid .card{margin:0}
-.eyebrow{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.hero{position:relative;overflow:hidden}
-.hero::before{content:'';position:absolute;inset:-40% -20% auto auto;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,var(--hc,#8b7cff)55,transparent 70%);opacity:.35;pointer-events:none}
-.bigav{width:56px;height:56px;border-radius:28px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:19px;color:#fff;flex:none;box-shadow:0 6px 20px #0008}
-.hero .who{font-size:24px;font-weight:800;letter-spacing:-.03em}
-.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:#ffffff0d;font-size:12px;font-weight:600;color:var(--txt)}
-.pill.me{background:#3ddc9722;color:var(--ok)}
-.evbig{cursor:pointer}.evbig .t{font-size:20px;font-weight:700;letter-spacing:-.02em}
-.count{font-size:40px;font-weight:800;letter-spacing:-.04em;line-height:1;background:linear-gradient(135deg,#fff,#b9b0ff);-webkit-background-clip:text;background-clip:text;color:transparent}
-.link{color:var(--acc);font-size:13px;font-weight:600;cursor:pointer;background:none;border:0;padding:0;font-family:inherit}
-@media(max-width:600px){.calcell{min-height:58px;padding:3px;border-radius:10px}.chip{font-size:9px;padding:1px 3px;border-radius:4px}.card{padding:14px}.hello h2{font-size:26px}}
+.eyebrow{font-size:13px;font-weight:600;text-transform:uppercase;color:var(--mut);margin-bottom:10px;display:flex;align-items:center;gap:6px;letter-spacing:0}
+.hero{overflow:hidden}
+.bigav{width:60px;height:60px;border-radius:30px;display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:22px;color:#fff;flex:none}
+.hero .who{font-size:28px;font-weight:700;letter-spacing:-.03em}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:var(--panel2);font-size:13px;font-weight:600;color:var(--txt)}
+.pill.me{background:#30d15826;color:var(--ok)}
+.evbig{cursor:pointer}.evbig .t{font-size:22px;font-weight:700;letter-spacing:-.025em}
+.count{font-size:44px;font-weight:700;letter-spacing:-.04em;line-height:1;color:var(--acc)}
+.link{color:var(--acc);font-size:15px;font-weight:400;cursor:pointer;background:none;border:0;padding:0;font-family:inherit;text-transform:none}
+/* lista stile Impostazioni */
+.glist{background:var(--panel);border-radius:var(--r);overflow:hidden;margin-bottom:22px}
+.glist .gi{display:flex;align-items:center;gap:12px;padding:0 16px;min-height:48px;cursor:pointer;width:100%;background:none;border:0;color:var(--txt);font:inherit;font-size:17px;text-align:left}
+.glist .gi+.gi .gt{border-top:.5px solid var(--line)}
+.glist .gt{flex:1;display:flex;align-items:center;min-height:48px}
+.glist .ic{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;font-size:16px;flex:none}
+.glist .chev{color:#5a5a5f;font-size:20px}
+.ghead{font-size:13px;color:var(--mut);text-transform:uppercase;margin:0 0 7px 16px}
+@media(max-width:600px){.calcell{min-height:58px}.chip{font-size:9px;padding:1px 2px}.card{padding:14px}.hello h2{font-size:32px}}
 </style>
 </head>
 <body>
 <div id="shell">
 <header>
   <h1><span class="logo"><i></i><i></i><i></i><i></i><i></i><i></i></span>Ledwall</h1>
-  <nav id="nav">
-    <button data-v="calendario">Home</button>
-    <button data-v="eventi">Eventi</button>
-    <button data-v="turni">Turni</button>
-    <button data-v="task">Task</button>
-    <button data-v="inventario">Inventario</button>
-    <button data-v="assenze">🚫 Assenze</button>
-    <button data-v="registro">Registro</button>
-    <button data-v="backup">⚙️ Altro</button>
-  </nav>
-  <span class="sp"></span><span id="online"></span><span id="saveSt"></span><button class="btn sec sm" id="pwbtn" style="display:none">👤 Profilo</button><button class="btn sec sm" id="logout" style="display:none">Esci</button>
+  <span class="sp"></span><span id="online"></span><span id="saveSt"></span><button id="pwbtn" style="display:none" aria-label="Profilo">👤</button><button class="btn sec sm" id="logout" style="display:none">Esci</button>
 </header>
+  <nav id="nav">
+    <button data-v="calendario"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg>Home</button>
+    <button data-v="eventi"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Eventi</button>
+    <button data-v="turni"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.4-.3 4.1 1.3 4.6 4.3"/></svg>Turni</button>
+    <button data-v="task"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/></svg>Task</button>
+    <button data-v="inventario"><svg viewBox="0 0 24 24"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg>Inventario</button>
+    <button data-v="assenze"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m6 6 12 12"/></svg>Assenze</button>
+    <button data-v="backup"><svg viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="18.5" cy="12" r="1.3" fill="currentColor"/></svg>Altro</button>
+  </nav>
 <main id="app"></main>
 <div id="dlg"><div><p id="dlgTxt"></p><div class="row"><span class="sp"></span><button class="btn sec" id="dlgNo">Annulla</button><button class="btn bad" id="dlgYes">Conferma</button></div></div></div>
 <div id="toast"></div>
 <div id="pwdlg" style="position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:45;padding:20px"><form class="card" id="pwForm" style="max-width:360px;width:100%"><h2>Profilo</h2>
 <label>Il tuo nome (lo vedono gli altri)</label><input id="pwName" maxlength="30" required>
 <label>Nuova password (lascia vuoto per non cambiarla)</label><input type="password" id="pw1" autocomplete="new-password" minlength="8">
-<div class="row" style="margin-top:10px"><span class="sp"></span><button type="button" class="btn sec" id="pwNo">Annulla</button><button class="btn">Salva</button></div><p class="mut" id="pwErr"></p></form></div>
+<div class="row" style="margin-top:14px"><span class="sp"></span><button type="button" class="btn sec" id="pwNo">Annulla</button><button class="btn">Salva</button></div><p class="mut" id="pwErr"></p>
+<button type="button" class="btn bad" style="width:100%;margin-top:6px" onclick="document.getElementById('pwdlg').style.display='none';document.getElementById('logout').click()">Esci dall'account</button></form></div>
 <div id="login"><form class="card" id="loginForm"><h2>🎛️ Gestionale Ledwall</h2>
 <label>Email</label><input type="email" id="lEmail" autocomplete="username" required>
 <label>Password</label><input type="password" id="lPass" autocomplete="current-password" required>
@@ -390,11 +411,14 @@ function needs(ev){
 /* ===================== VISTE ===================== */
 let view='calendario', curEv=null;
 try{const u=JSON.parse(sessionStorage.getItem(KEY+'-ui'));if(u){view=u.view||view;curEv=u.curEv||null}}catch(e){}
-document.getElementById('nav').onclick=e=>{const v=e.target.dataset.v;if(v){view=v;curEv=null;rememberUI();render()}};
+document.getElementById('nav').onclick=e=>{const b=e.target.closest('[data-v]');const v=b&&b.dataset.v;if(v){view=v;curEv=null;rememberUI();render()}};
 function rememberUI(){try{sessionStorage.setItem(KEY+'-ui',JSON.stringify({view,curEv}))}catch(e){}}
 function render(){
   const adm=isAdmin(); if(!adm){curEv=null;if(!VISTE_UTENTE.includes(view))view='calendario'}
-  document.querySelectorAll('#nav button').forEach(b=>{b.classList.toggle('on',b.dataset.v===view);b.style.display=(adm||VISTE_UTENTE.includes(b.dataset.v))?'':'none'});
+  const TABS=adm?['calendario','eventi','turni','task','backup']:['calendario','inventario','assenze','backup'];
+  const attivo=TABS.includes(view)?view:'backup';
+  document.querySelectorAll('#nav button').forEach(b=>{b.classList.toggle('on',b.dataset.v===attivo);b.style.display=TABS.includes(b.dataset.v)?'':'none'});
+  const pb=document.getElementById('pwbtn');if(pb&&USER)pb.textContent=initials(myName());
   const app=document.getElementById('app');
   app.innerHTML = (ANTEPRIMA&&realAdmin()?`<div class="card" style="border:1px solid var(--acc)"><div class="row"><b>👁 Anteprima: vedi il sito come Lucas, Matteo ed Edo</b><span class="sp"></span><button class="btn sm" data-ante="0">Esci dall'anteprima</button></div></div>`:'')
     + (curEv? vEvent(curEv) : ({eventi:vEvents,inventario:adm?vInv:vInvRO,assenze:vAssenze,calendario:vHome,registro:vLog,backup:adm?vBackup:vWidget,task:vTask,turni:vTurni}[view]||vCal)());
@@ -639,7 +663,7 @@ function vHome(){
   const tasks=adm?(DB.tasks||[]).filter(x=>!x.fatto).sort((a,b)=>(a.scadenza||'9').localeCompare(b.scadenza||'9')):[];
   const tkCard=adm?`<div class="card"><div class="eyebrow">✅ Task <span class="sp"></span><button class="link" data-gov="task">Tutti →</button></div>${tasks.slice(0,5).map(x=>`<div class="task"><input type="checkbox" data-tdone="${x.id}"><div style="flex:1;min-width:0"><div class="tt">${esc(x.testo)}</div>${x.chi||x.scadenza?`<div class="mut">${x.chi?esc(x.chi):''}${x.chi&&x.scadenza?' · ':''}${x.scadenza?`<span class="${x.scadenza<oggi?'bad':''}">${new Date(x.scadenza+'T12:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</span>`:''}</div>`:''}</div></div>`).join('')||'<p class="mut" style="margin:0">Niente da fare 🎉</p>'}${tasks.length>5?`<div class="mut" style="margin-top:8px">+ altri ${tasks.length-5}</div>`:''}</div>`:'';
   return `<div class="hello"><h2>${saluto}, ${esc(me)}</h2><p style="text-transform:capitalize">${dataLunga}</p></div>
-  <div class="hgrid">${hero}<div class="wide">${vCal()}</div>${evCard}${tkCard}</div>`;
+  <div class="hgrid"><div class="wide">${vCal()}</div><div class="side">${hero}${evCard}${tkCard}</div></div>`;
 }
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-gov]');if(!b)return;view=b.dataset.gov;curEv=null;rememberUI();render();scrollTo(0,0)});
 /* ---------- Task e checklist ---------- */
@@ -696,8 +720,13 @@ function vWidget(){
 }
 async function copia(t,msg){try{await navigator.clipboard.writeText(t);toast(msg)}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast(msg)}catch(_){toast('Copia non riuscita')}ta.remove()}}
 /* ---------- Backup ---------- */
+function gi(ic,col,txt,attr){return `<button class="gi" ${attr}><span class="ic" style="background:${col}">${ic}</span><span class="gt">${txt}<span class="sp"></span><span class="chev">›</span></span></button>`}
 function vBackup(){
-  return vWidget()+`<div class="card"><h2>👁 Vedi come gli altri</h2><p class="mut">Lucas, Matteo ed Edo vedono solo il calendario dei turni, l'inventario in sola lettura e il widget. Tu e Sebi vedete e modificate tutto.</p><button class="btn sec" data-ante="1">👁 Apri l'anteprima</button></div>`+`<div class="card"><h2>Backup dati</h2>
+  return `<div class="hello"><h2>Altro</h2></div>
+  <div class="glist">${gi('📦','#ff9f0a','Inventario','data-gov="inventario"')}${gi('🚫','#ff453a','Assenze','data-gov="assenze"')}${gi('🕘','#5e5ce6','Registro modifiche','data-gov="registro"')}</div>
+  <div class="ghead">Permessi</div>
+  <div class="glist">${gi('👁','#30d158','Vedi il sito come gli altri','data-ante="1"')}</div>
+  <p class="mut" style="margin:-14px 16px 22px;font-size:13px">Lucas, Matteo ed Edo vedono il calendario dei turni, l'inventario in sola lettura, le assenze e il widget. Tu e Sebi vedete e modificate tutto.</p>`+vWidget()+`<div class="card"><h2>Backup dati</h2>
   <p class="mut">I dati sono sincronizzati online sul tuo account. Puoi comunque esportare un backup (file .json) per sicurezza.</p>
   <div class="row"><button class="btn" data-act="export">⬇️ Esporta backup</button>
   <label class="btn sec" style="margin:0;color:var(--txt);font-size:15px">⬆️ Importa backup<input type="file" id="imp" accept=".json" hidden></label>
