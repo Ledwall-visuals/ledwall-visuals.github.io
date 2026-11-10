@@ -57,11 +57,53 @@ function intervallo(l) {
   const b = new Date(fineGiorno(l) + "T12:00"); if (h[1] <= h[0]) b.setDate(b.getDate() + 1); b.setHours(h[1], 0, 0, 0);
   return [a, b];
 }
+// registratore di disegno: le stesse istruzioni vengono disegnate in un canvas (WebView) per poter "ritagliare" la scritta
+// dalla barra (con la tinta di iOS ogni colore diventa bianco, un buco invece resta del colore dello sfondo).
+// Se il WebView non è disponibile si ridisegna tutto con DrawContext come prima.
+class PathR { constructor() { this.o = []; } move(p) { this.o.push(["m", p.x, p.y]); } addLine(p) { this.o.push(["l", p.x, p.y]); } addQuadCurve(p, k) { this.o.push(["q", k.x, k.y, p.x, p.y]); } addRoundedRect(r, a) { this.o.push(["r", r.x, r.y, r.width, r.height, a]); } closeSubpath() { this.o.push(["z"]); } }
+class Rec {
+  constructor(w, h) { this.w = w; this.h = h; this.ops = []; this.st = {}; }
+  addPath(p) { this.p = p.o; } setFillColor(c) { this.st.f = [c.hex, c.alpha]; } setStrokeColor(c) { this.st.s = [c.hex, c.alpha]; } setLineWidth(w) { this.st.lw = w; }
+  fillPath() { this.ops.push({ k: "fp", p: this.p, f: this.st.f }); } strokePath() { this.ops.push({ k: "sp", p: this.p, s: this.st.s, lw: this.st.lw }); }
+  fillRect(r) { this.ops.push({ k: "fr", r: [r.x, r.y, r.width, r.height], f: this.st.f }); }
+  testo(t, r, col, buco) { this.ops.push({ k: "tx", t, r: [r.x, r.y, r.width, r.height], c: col, buco }); }
+}
+let WV = null;
+async function inCanvas(rec) {
+  if (WV === false) return null;
+  try {
+    if (!WV) { WV = new WebView(); await WV.loadHTML("<canvas id=c></canvas>"); }
+    const js = `(function(R){const S=3,c=document.getElementById('c');c.width=R.w*S;c.height=R.h*S;const k=c.getContext('2d');k.scale(S,S);
+const col=f=>{const h=f[0].replace('#','');return 'rgba('+parseInt(h.slice(0,2),16)+','+parseInt(h.slice(2,4),16)+','+parseInt(h.slice(4,6),16)+','+f[1]+')'};
+const path=o=>{k.beginPath();o.forEach(a=>{if(a[0]=='m')k.moveTo(a[1],a[2]);else if(a[0]=='l')k.lineTo(a[1],a[2]);else if(a[0]=='q')k.quadraticCurveTo(a[1],a[2],a[3],a[4]);else if(a[0]=='r')k.roundRect(a[1],a[2],a[3],a[4],a[5]);else k.closePath()})};
+R.ops.forEach(o=>{k.globalCompositeOperation='source-over';
+if(o.k=='fp'){path(o.p);k.fillStyle=col(o.f);k.fill()}
+else if(o.k=='sp'){path(o.p);k.strokeStyle=col(o.s);k.lineWidth=o.lw||1;k.stroke()}
+else if(o.k=='fr'){k.fillStyle=col(o.f);k.fillRect(o.r[0],o.r[1],o.r[2],o.r[3])}
+else if(o.k=='tx'){k.font='800 8px -apple-system,system-ui';k.textAlign='center';k.textBaseline='middle';if(o.buco)k.globalCompositeOperation='destination-out';k.fillStyle=o.buco?'#000':col(o.c);k.fillText(o.t,o.r[0]+o.r[2]/2,o.r[1]+o.r[3]/2)}});
+return c.toDataURL('image/png')})(${JSON.stringify({ w: rec.w, h: rec.h, ops: rec.ops })})`;
+    const url = await WV.evaluateJavaScript(js);
+    return Image.fromData(Data.fromBase64String(String(url).split(",")[1]));
+  } catch (e) { WV = false; return null; }
+}
+function inDrawContext(rec) {
+  const c = new DrawContext(); c.size = new Size(rec.w, rec.h); c.opaque = false; c.respectScreenScale = true;
+  const path = o => { const p = new Path(); o.forEach(a => { if (a[0] == "m") p.move(new Point(a[1], a[2])); else if (a[0] == "l") p.addLine(new Point(a[1], a[2])); else if (a[0] == "q") p.addQuadCurve(new Point(a[3], a[4]), new Point(a[1], a[2])); else if (a[0] == "r") p.addRoundedRect(new Rect(a[1], a[2], a[3], a[4]), a[5], a[5]); else p.closeSubpath(); }); return p; };
+  rec.ops.forEach(o => {
+    if (o.k == "fp") { c.addPath(path(o.p)); c.setFillColor(new Color(o.f[0], o.f[1])); c.fillPath(); }
+    else if (o.k == "sp") { c.addPath(path(o.p)); c.setStrokeColor(new Color(o.s[0], o.s[1])); c.setLineWidth(o.lw || 1); c.strokePath(); }
+    else if (o.k == "fr") { c.setFillColor(new Color(o.f[0], o.f[1])); c.fillRect(new Rect(o.r[0], o.r[1], o.r[2], o.r[3])); }
+    else if (o.k == "tx") { c.setFont(Font.heavySystemFont(8)); c.setTextColor(o.buco ? new Color("#000000", 0.85) : new Color(o.c[0], o.c[1])); c.setTextAlignedCenter(); c.drawTextInRect(o.t, new Rect(o.r[0], o.r[1] + 4, o.r[2], o.r[3])); }
+  });
+  return c;
+}
+async function disegna(rec) { return (await inCanvas(rec)) || inDrawContext(rec); }
+
 // barra dei turni di lavoro su una settimana: una riga continua da lunedì all'ora di inizio fino all'ora di fine
 function barreSettimana(lunedi, larg, alt, cw, gap, celle) {
-  const c = new DrawContext(); c.size = new Size(larg, alt); c.opaque = false; c.respectScreenScale = true;
+  const c = new Rec(larg, alt);
   // sfondo delle celle disegnato qui sotto, così le barre stanno sopra
-  (celle || []).forEach((k, i) => { if (!k) return; const p = new Path(); p.addRoundedRect(new Rect(i * (cw + gap), 0, cw, alt), 6, 6); c.addPath(p); c.setFillColor(new Color("#ffffff", k === "dim" ? 0.03 : 0.08)); c.fillPath(); });
+  (celle || []).forEach((k, i) => { if (!k) return; const p = new PathR(); p.addRoundedRect(new Rect(i * (cw + gap), 0, cw, alt), 6, 6); c.addPath(p); c.setFillColor(new Color("#ffffff", k === "dim" ? 0.03 : 0.08)); c.fillPath(); });
   const t0 = new Date(lunedi); t0.setHours(0, 0, 0, 0); const t1 = new Date(t0); t1.setDate(t1.getDate() + 7);
   const xOf = dt => { const g = (dt - t0) / 864e5; const di = Math.min(6, Math.max(0, Math.floor(g))); return Math.min(larg, Math.max(0, di * (cw + gap) + (g - di) * cw)); };
   const ora = new Date(), m0 = new Date(ora.getFullYear(), ora.getMonth(), 1), m1 = new Date(ora.getFullYear(), ora.getMonth() + 1, 1);
@@ -80,7 +122,7 @@ function barreSettimana(lunedi, larg, alt, cw, gap, celle) {
     const col = l.col ? l.col.hex : "ff9f0a", r = 4;
     // tratti con la stessa trasparenza uniti in una sola forma; arrotondati solo gli estremi esterni (niente righine o giunture)
     const pezzo = (u, v, a, sx2, dx2) => {
-      const p = new Path(), L = sx2 ? r : 0, R = dx2 ? r : 0;
+      const p = new PathR(), L = sx2 ? r : 0, R = dx2 ? r : 0;
       p.move(new Point(u + L, y)); p.addLine(new Point(v - R, y));
       if (R) p.addQuadCurve(new Point(v, y + r), new Point(v, y)); p.addLine(new Point(v, y + hb - R));
       if (R) p.addQuadCurve(new Point(v - r, y + hb), new Point(v, y + hb)); p.addLine(new Point(u + L, y + hb));
@@ -93,7 +135,7 @@ function barreSettimana(lunedi, larg, alt, cw, gap, celle) {
     pezzo(sx, x1, sa, sx === x0, true);
     const ia = Math.max(x0, xm0), ib = Math.min(x1, xm1), dentro = ib - ia > 30;
     const ta = dentro ? ia : x0, tb = dentro ? ib : x1;
-    if (tb - ta > 24) { c.setFont(Font.heavySystemFont(8)); c.setTextColor(dentro ? new Color("#000000", 0.85) : new Color("#ffffff", 0.4)); c.setTextAlignedCenter(); c.drawTextInRect((l.cal || "Lavoro").toUpperCase(), new Rect(ta, y + 4, tb - ta, hb)); }
+    if (tb - ta > 24) c.testo((l.cal || "Lavoro").toUpperCase(), new Rect(ta, y, tb - ta, hb), ["ffffff", 0.4], dentro);
   });
   // giorno di oggi: solo una cornice, interrotta dove passa una barra
   const oggi0 = new Date(); oggi0.setHours(0, 0, 0, 0); const gi = Math.round((oggi0 - t0) / 864e5);
@@ -101,16 +143,16 @@ function barreSettimana(lunedi, larg, alt, cw, gap, celle) {
     const L = gi * (cw + gap) + 1, R = L + cw - 2, T = 1, B = alt - 1, k = 6;
     const sopra = barre.some(([u, v]) => u < R && v > L);
     c.setStrokeColor(new Color("#4f8cff")); c.setLineWidth(2);
-    const arco = (pts) => { const p = new Path(); p.move(pts[0]); for (let q = 1; q < pts.length; q++) p.addLine(pts[q]); c.addPath(p); c.strokePath(); };
+    const arco = (pts) => { const p = new PathR(); p.move(pts[0]); for (let q = 1; q < pts.length; q++) p.addLine(pts[q]); c.addPath(p); c.strokePath(); };
     const P = (x, yy) => new Point(x, yy);
-    if (!sopra) { const p = new Path(); p.addRoundedRect(new Rect(L, T, cw - 2, alt - 2), k, k); c.addPath(p); c.strokePath(); }
+    if (!sopra) { const p = new PathR(); p.addRoundedRect(new Rect(L, T, cw - 2, alt - 2), k, k); c.addPath(p); c.strokePath(); }
     else {
       const ya = y - 2, yb = y + hb + 2;
       arco([P(L, ya), P(L, T + k), P(L + 1.8, T + 1.8), P(L + k, T), P(R - k, T), P(R - 1.8, T + 1.8), P(R, T + k), P(R, ya)]);
       arco([P(L, yb), P(L, B - k), P(L + 1.8, B - 1.8), P(L + k, B), P(R - k, B), P(R - 1.8, B - 1.8), P(R, B - k), P(R, yb)]);
     }
   }
-  return c.getImage();
+  return c;
 }
 // prossima domenica (oggi compreso)
 const nx = Object.values(turni).sort((a, b) => a.data.localeCompare(b.data)).find(t => t.data >= today && (t.mattina || t.sera));
@@ -192,7 +234,7 @@ if (mode.toLowerCase().startsWith("task")) {
   w.addSpacer(2);
   for (let r = 0; r < rows; r++) {
     const row = w.addStack(); row.spacing = 2;
-    if (days[r * 7]) { const celle = days.slice(r * 7, r * 7 + 7).map(x => !x || x.blank ? null : x.extra ? "dim" : "ok"); const img = barreSettimana(days[r * 7].dt, 7 * cw + 12, ch, cw, 2, celle); if (img) row.backgroundImage = img; }
+    if (days[r * 7]) { const celle = days.slice(r * 7, r * 7 + 7).map(x => !x || x.blank ? null : x.extra ? "dim" : "ok"); const img = await disegna(barreSettimana(days[r * 7].dt, 7 * cw + 12, ch, cw, 2, celle)); if (img) row.backgroundImage = img; }
     for (let i = 0; i < 7; i++) {
       const it = days[r * 7 + i]; const cell = row.addStack(); cell.size = new Size(cw, ch); cell.layoutVertically(); cell.cornerRadius = 6;
       if (!it || it.blank) continue;
