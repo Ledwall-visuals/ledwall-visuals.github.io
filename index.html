@@ -523,14 +523,17 @@ function vEvent(id){
       <div><b>${c.pxW} × ${c.pxH}</b><span>risoluzione px (${(c.pxW*c.pxH/1e6).toFixed(2)} MP)</span></div>
       <div><b>${c.kg.toFixed(0)} kg</b><span>peso moduli</span></div>
       <div><b>${(c.watt/1000).toFixed(1)} kW</b><span>consumo max (~${Math.ceil(c.watt/230)} A a 230V)</span></div></div>`;
-      h+=`<div class="pmbox">${(()=>{const k=Math.min(900/Math.max(1,c.pxW),340/Math.max(1,c.pxH)),dw=Math.round(c.pxW*k),dh=Math.round(c.pxH*k);return `<canvas class="pm" data-pm="${i}" width="${dw*2}" height="${dh*2}" style="width:${dw}px"></canvas>`})()}
+      h+=`<div class="pmbox">${(()=>{const k=Math.min(900/Math.max(1,c.pxW),340/Math.max(1,c.pxH)),dw=Math.round(c.pxW*k),dh=Math.round(c.pxH*k);return `<canvas class="pm" data-pm="${i}" width="${dw*2}" height="${dh*2}" style="width:${dw}px${s.cabOn==='1'&&s.cabMode==='man'?';touch-action:none;cursor:crosshair':''}"></canvas>`})()}
       <div class="row noprint" style="margin-top:8px"><b style="flex:1">🎯 Pixelmap ${c.pxW} × ${c.pxH}</b><button class="btn sm" data-pmvid="${i}">🎬 Scarica video loop</button><button class="btn sec sm" data-pmpng="${i}">🖼 PNG</button></div>
       <div class="grid noprint" style="margin-top:8px"><div><label>Vista</label><select data-sf="cabOn"><option value="">🎯 Pixelmap</option><option value="1" ${s.cabOn==='1'?'selected':''}>🔌 Cablaggio</option></select></div>
-      ${s.cabOn==='1'?(()=>{const cp=cabPlan(c,s);return `<div><label>Partenza</label><select data-sf="cabStart">${[['BL','In basso a sinistra'],['BR','In basso a destra'],['TL','In alto a sinistra'],['TR','In alto a destra']].map(([v,l])=>`<option value="${v}" ${(s.cabStart||'BL')===v?'selected':''}>${l}</option>`).join('')}</select></div>
-      <div><label>Direzione</label><select data-sf="cabDir"><option value="col" ${(s.cabDir||'col')==='col'?'selected':''}>Per colonne ↕</option><option value="row" ${s.cabDir==='row'?'selected':''}>Per file ↔</option></select></div>
+      ${s.cabOn==='1'?(()=>{const cp=cabPlan(c,s);return `<div><label>Modo</label><select data-sf="cabMode"><option value="">Automatico</option><option value="man" ${s.cabMode==='man'?'selected':''}>✋ A mano</option></select></div>
+      ${s.cabMode==='man'?`<div style="grid-column:1/-1"><div class="row" style="gap:6px">${((s.cabMan&&s.cabMan.ports)||[[]]).map((ch,p)=>`<button class="btn sm ${(CABPORT[i]||0)===p?'':'sec'}" data-cabport="${i}:${p}" style="${(CABPORT[i]||0)===p?`background:${CAB_COL[p%CAB_COL.length]};color:#000`:''}">P${p+1} · ${ch.length}</button>`).join('')}<button class="btn sec sm" data-cabadd="${i}">＋ Porta</button><span class="sp"></span><button class="btn sec sm" data-cabundo="${i}">↩︎ Annulla</button><button class="btn sec sm" data-cabclr="${i}">Svuota porta</button><button class="btn sec sm" data-cabcopy="${i}">Parti dall'automatico</button><button class="btn bad sm" data-caball="${i}">Svuota tutto</button></div>
+      <p class="mut" style="margin:6px 0 0">Scegli la porta e passa col mouse (tieni premuto) o col dito sui moduli nell'ordine dei cavi. Tocca di nuovo un modulo per toglierlo.</p></div>`:''}
+      ${s.cabMode==='man'?'':`<div><label>Partenza</label><select data-sf="cabStart">${[['BL','In basso a sinistra'],['BR','In basso a destra'],['TL','In alto a sinistra'],['TR','In alto a destra']].map(([v,l])=>`<option value="${v}" ${(s.cabStart||'BL')===v?'selected':''}>${l}</option>`).join('')}</select></div>
+      <div><label>Direzione</label><select data-sf="cabDir"><option value="col" ${(s.cabDir||'col')==='col'?'selected':''}>Per colonne ↕</option><option value="row" ${s.cabDir==='row'?'selected':''}>Per file ↔</option></select></div>`}
       <div><label>Pixel max per porta</label><input type="number" data-sf="cabPx" value="${s.cabPx||650000}"></div>
       <div><label>Ampere per linea</label><input type="number" data-sf="cabA" value="${s.cabA||16}"></div>
-      <div style="grid-column:1/-1" class="mut">🔌 <b>${cp.ports}</b> porte dati (max ${cp.mpp} moduli per porta) · ⚡ <b>${cp.lines}</b> linee di corrente da ${cp.A} A (max ${cp.mpl} moduli per linea${+c.it.watt?'':', manca il consumo del modulo'})</div>`})():''}</div></div>`;
+      <div style="grid-column:1/-1" class="mut">${cp.troppi.length?`<span class="bad">⚠️ Troppi moduli su ${cp.troppi.map(n=>'P'+n).join(', ')} (max ${cp.mpp})</span> · `:''}${s.cabMode==='man'&&cp.liberi?`<span class="bad">${cp.liberi} moduli senza cavo</span> · `:''}🔌 <b>${cp.ports}</b> porte dati (max ${cp.mpp} moduli per porta) · ⚡ <b>${cp.lines}</b> linee di corrente da ${cp.A} A (max ${cp.mpl} moduli per linea${+c.it.watt?'':', manca il consumo del modulo'})</div>`})():''}</div></div>`;
     } else h+=`<p class="bad">Aggiungi prima un tipo di cassa LED nell'inventario.</p>`;
     h+='</div>';
   });
@@ -661,9 +664,14 @@ function cabPlan(c,s){
   const fromRight=start[1]==='R', fromBottom=start[0]==='B', order=[];
   if(dir==='col'){for(let a=0;a<c.cols;a++){const k=fromRight?c.cols-1-a:a;for(let b=0;b<c.rows;b++){const up=(a%2===0)===fromBottom;order.push([k,up?c.rows-1-b:b])}}}
   else{for(let a=0;a<c.rows;a++){const r=fromBottom?c.rows-1-a:a;for(let b=0;b<c.cols;b++){const lr=(a%2===0)!==fromRight;order.push([lr?b:c.cols-1-b,r])}}}
-  const mpp=Math.max(1,Math.floor(px/(c.it.pxW*c.it.pxH))), mpl=watt?Math.max(1,Math.floor(A*230/watt)):order.length;
-  const pos={};order.forEach(([k,r],i)=>pos[k+','+r]={p:Math.floor(i/mpp)+1,idx:i%mpp+1,l:Math.floor(i/mpl)+1});
-  return {order,mpp,mpl,ports:Math.ceil(order.length/mpp),lines:Math.ceil(order.length/mpl),pos,A};
+  const mpp=Math.max(1,Math.floor(px/(c.it.pxW*c.it.pxH)));
+  let chains=[];
+  if(s.cabMode==='man')chains=((s.cabMan&&s.cabMan.ports)||[[]]).map(ch=>ch.filter(([k,r])=>k<c.cols&&r<c.rows));
+  else for(let i=0;i<order.length;i+=mpp)chains.push(order.slice(i,i+mpp));
+  if(!chains.length)chains=[[]];
+  const all=chains.flat(), mpl=watt?Math.max(1,Math.floor(A*230/watt)):Math.max(1,all.length);
+  const pos={};let g=0;chains.forEach((ch,p)=>ch.forEach(([k,r],i)=>{pos[k+','+r]={p:p+1,idx:i+1,l:Math.floor(g++/mpl)+1}}));
+  return {order,chains,mpp,mpl,ports:chains.length,lines:Math.max(1,Math.ceil(all.length/mpl)),pos,A,liberi:c.cols*c.rows-all.length,troppi:chains.map((ch,i)=>ch.length>mpp?i+1:0).filter(Boolean)};
 }
 function pmDraw(g,c,t,scr){
   const W=c.pxW,H=c.pxH,mw=c.it.pxW,mh=c.it.pxH;
@@ -707,7 +715,8 @@ function pmDraw(g,c,t,scr){
 function pmCab(g,c,t,scr,cab){
   const W=c.pxW,H=c.pxH,mw=c.it.pxW,mh=c.it.pxH,lw=Math.max(3,Math.round(Math.min(mw,mh)/22));
   const cen=([k,r])=>[k*mw+mw/2,r*mh+mh/2];
-  for(let p=0;p<cab.ports;p++){const pts=cab.order.slice(p*cab.mpp,(p+1)*cab.mpp).map(cen), col=CAB_COL[p%CAB_COL.length];
+  if(scr.cabMode==='man')for(let r=0;r<c.rows;r++)for(let k=0;k<c.cols;k++)if(!cab.pos[k+','+r]){g.fillStyle='rgba(0,0,0,.55)';g.fillRect(k*mw,r*mh,mw,mh)}
+  for(let p=0;p<cab.ports;p++){const pts=cab.chains[p].map(cen), col=CAB_COL[p%CAB_COL.length];if(!pts.length)continue;
     g.lineCap='round';g.lineJoin='round';
     g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=lw*1.9;g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.stroke();
     g.strokeStyle=col;g.lineWidth=lw;g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.stroke();
@@ -747,6 +756,34 @@ document.addEventListener('click',async e=>{
   rec.stop();await fine;b.disabled=false;b.textContent=txt0;
   pmSave(new Blob(parts,{type:mime.split(';')[0]}),pmFile(o,mime.includes('mp4')?'mp4':'webm'));toast('Video pronto ✓ (dura '+PM_LOOP+' s e va in loop)');
 });
+
+/* ---------- Cablaggio a mano (come NovaLCT) ---------- */
+let CABDRAG=null;
+function cabScr(i){const ev=curEv&&DB.events.find(x=>x.id===curEv);return ev&&ev.screens[+i]?{ev,s:ev.screens[+i]}:null}
+function cabMan(s){s.cabMan=s.cabMan||{ports:[[]]};if(!s.cabMan.ports.length)s.cabMan.ports=[[]];return s.cabMan}
+function cabSave(o,msg){stamp(o.ev);if(msg)logChange(`Evento "${o.ev.name}", ${o.s.name}: ${msg}`);save()}
+function cabCell(cv,e){const o=pmScreen(cv.dataset.pm);if(!o)return null;const r=cv.getBoundingClientRect();
+  const x=(e.clientX-r.left)/r.width*o.c.pxW,y=(e.clientY-r.top)/r.height*o.c.pxH;const k=Math.floor(x/o.c.it.pxW),rr=Math.floor(y/o.c.it.pxH);
+  return k>=0&&rr>=0&&k<o.c.cols&&rr<o.c.rows?[k,rr]:null}
+function cabTocca(i,cell,primo){const o=cabScr(i);if(!o)return;const M=cabMan(o.s),ap=Math.min(CABPORT[i]||0,M.ports.length-1),ch=M.ports[ap];
+  const key=cell.join(','),dove=M.ports.findIndex(c=>c.some(m=>m.join(',')===key));
+  if(dove>=0){if(primo){M.ports[dove]=M.ports[dove].filter(m=>m.join(',')!==key);CABDRAG.tolto=true}return}
+  if(CABDRAG&&CABDRAG.tolto)return; ch.push(cell);}
+document.addEventListener('pointerdown',e=>{const cv=e.target.closest&&e.target.closest('canvas[data-pm]');if(!cv)return;const o=cabScr(cv.dataset.pm);
+  if(!o||o.s.cabOn!=='1'||o.s.cabMode!=='man')return;e.preventDefault();cv.setPointerCapture&&cv.setPointerCapture(e.pointerId);
+  CABDRAG={i:cv.dataset.pm,cv,last:null,tolto:false};const cell=cabCell(cv,e);if(cell){CABDRAG.last=cell.join(',');cabTocca(cv.dataset.pm,cell,true)}});
+document.addEventListener('pointermove',e=>{if(!CABDRAG)return;const cell=cabCell(CABDRAG.cv,e);if(!cell||cell.join(',')===CABDRAG.last)return;CABDRAG.last=cell.join(',');cabTocca(CABDRAG.i,cell,false)});
+document.addEventListener('pointerup',()=>{if(!CABDRAG)return;const o=cabScr(CABDRAG.i);CABDRAG=null;if(o){cabSave(o,'modificato il cablaggio a mano');render()}});
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-cabport],[data-cabadd],[data-cabundo],[data-cabclr],[data-cabcopy],[data-caball]');if(!b)return;
+  const d=b.dataset;
+  if(d.cabport){const [i,p]=d.cabport.split(':');CABPORT[i]=+p;render();return}
+  const i=d.cabadd||d.cabundo||d.cabclr||d.cabcopy||d.caball, o=cabScr(i);if(!o)return;const M=cabMan(o.s),ap=Math.min(CABPORT[i]||0,M.ports.length-1);
+  if(d.cabadd){M.ports.push([]);CABPORT[i]=M.ports.length-1;cabSave(o,'aggiunta una porta')}
+  else if(d.cabundo){M.ports[ap].pop();cabSave(o)}
+  else if(d.cabclr){M.ports[ap]=[];cabSave(o,`svuotata la porta P${ap+1}`)}
+  else if(d.cabcopy){const c=screenCalc(o.s);const cp=cabPlan(c,{...o.s,cabMode:''});M.ports=cp.chains.map(ch=>ch.map(x=>[...x]));CABPORT[i]=0;cabSave(o,'cablaggio a mano copiato dall\'automatico')}
+  else if(d.caball){M.ports=[[]];CABPORT[i]=0;cabSave(o,'cablaggio a mano svuotato')}
+  render()});
 /* ---------- Home ---------- */
 function vHome(){
   const adm=isAdmin(), oggi=oggiS(), me=first(myName());
@@ -773,6 +810,7 @@ function vHome(){
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-gov]');if(!b)return;view=b.dataset.gov;curEv=null;rememberUI();render();scrollTo(0,0)});
 /* ---------- Task e checklist ---------- */
 let ATT=[];
+window.CABPORT=window.CABPORT||{};
 async function loadAtt(){if(!USER||!sb)return;const {data,error}=await sb.from('attivita').select('*').order('created_at');if(error){console.error(error);return}
   ATT=data||[];if(!curEv&&['calendario','task'].includes(view)&&!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#app')))render()}
 const taskAperti=()=>ATT.filter(x=>x.tipo==='task'&&!x.fatto).sort((a,b)=>(a.scadenza||'9').localeCompare(b.scadenza||'9'));
