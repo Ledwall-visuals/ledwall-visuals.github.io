@@ -42,6 +42,33 @@ const ORE = { mattina: "6–14", mattino: "6–14", pomeriggio: "14–22", notte
 const corto = x => x.replace(":00", "");
 const orario = l => (!l.all && ds(l.s) === ds(l.e)) ? corto(hm(l.s)) + "–" + corto(hm(l.e)) : (!l.all ? corto(hm(l.s)) + "–" + corto(hm(l.e)) : (ORE[(l.cal || "").trim().toLowerCase()] || ""));
 const lavTxt = l => orario(l) || (l.cal || l.t || "Lavoro");
+// inizio e fine reali del turno (per gli eventi "tutto il giorno" uso gli orari standard del turno)
+const ORE_H = { mattina: [6, 14], mattino: [6, 14], pomeriggio: [14, 22], notte: [22, 6] };
+function intervallo(l) {
+  if (!l.all) return [l.s, l.e];
+  const h = ORE_H[(l.cal || "").trim().toLowerCase()] || [8, 17];
+  const a = new Date(l.s); a.setHours(h[0], 0, 0, 0);
+  const b = new Date(fineGiorno(l) + "T12:00"); if (h[1] <= h[0]) b.setDate(b.getDate() + 1); b.setHours(h[1], 0, 0, 0);
+  return [a, b];
+}
+// barra dei turni di lavoro su una settimana: una riga continua da lunedì all'ora di inizio fino all'ora di fine
+function barreSettimana(lunedi, larg, alt, cw, gap, dimDa) {
+  const c = new DrawContext(); c.size = new Size(larg, alt); c.opaque = false; c.respectScreenScale = true;
+  const t0 = new Date(lunedi); t0.setHours(0, 0, 0, 0); const t1 = new Date(t0); t1.setDate(t1.getDate() + 7);
+  const xOf = dt => { const g = (dt - t0) / 864e5; const di = Math.min(6, Math.max(0, Math.floor(g))); return Math.min(larg, Math.max(0, di * (cw + gap) + (g - di) * cw)); };
+  let n = 0;
+  lavoro.forEach(l => {
+    const [a, b] = intervallo(l); if (b <= t0 || a >= t1) return;
+    const x0 = xOf(a < t0 ? t0 : a), x1 = xOf(b > t1 ? t1 : b); if (x1 - x0 < 3) return; n++;
+    const y = 15, hb = 11, col = l.col ? l.col.hex : "ff9f0a";
+    const fuori = dimDa && a >= dimDa;
+    const p = new Path(); p.addRoundedRect(new Rect(x0, y, x1 - x0, hb), hb / 2, hb / 2);
+    c.addPath(p); c.setFillColor(new Color(col, fuori ? 0.4 : 0.9)); c.fillPath();
+    const lab = (l.cal || "Lavoro") + " " + orario(l);
+    if (x1 - x0 > 26) { c.setFont(Font.boldSystemFont(7.5)); c.setTextColor(new Color("#ffffff", fuori ? 0.6 : 1)); c.drawTextInRect(x1 - x0 > 70 ? lab : (l.cal || "Lavoro"), new Rect(x0 + 5, y + 1, x1 - x0 - 7, hb)); }
+  });
+  return n ? c.getImage() : null;
+}
 // prossima domenica (oggi compreso)
 const nx = (d.turni || []).find(t => t.data >= today);
 const nxNome = nx ? (nx.mattina === nx.sera ? first(nx.mattina) : [nx.mattina, nx.sera].filter(Boolean).map(first).join(" / ")) : "";
@@ -122,6 +149,7 @@ if (mode.toLowerCase().startsWith("task")) {
   w.addSpacer(2);
   for (let r = 0; r < rows; r++) {
     const row = w.addStack(); row.spacing = 2;
+    if (days[r * 7]) { const dimDa = days.slice(r * 7, r * 7 + 7).find(x => x && x.extra); const img = barreSettimana(days[r * 7].dt, 7 * cw + 12, ch, cw, 2, dimDa ? new Date(ds(dimDa.dt) + "T00:00") : null); if (img) row.backgroundImage = img; }
     for (let i = 0; i < 7; i++) {
       const it = days[r * 7 + i]; const cell = row.addStack(); cell.size = new Size(cw, ch); cell.layoutVertically(); cell.cornerRadius = 6;
       if (!it || it.blank) continue;
@@ -135,19 +163,17 @@ if (mode.toLowerCase().startsWith("task")) {
       if (taskOn(s).length) txt(top, "✓", Font.boldSystemFont(8), OK);
       const t = turni[s];
       if (t && (t.mattina || t.sera)) {
-        cell.addSpacer(1);
+        cell.addSpacer();
         const a = cell.addStack(); a.addSpacer();
         if (t.mattina === t.sera) { const im = a.addImage(circle(t.mattina, av, dim ? 0.35 : null)); im.imageSize = new Size(av, av); }
         else { [t.mattina, t.sera].filter(Boolean).forEach(n => { const im = a.addImage(circle(n, av - 6, dim ? 0.35 : null)); im.imageSize = new Size(av - 6, av - 6); }); }
         a.addSpacer();
       }
-      const lv = lavOn(s)[0];
-      if (lv) { cell.addSpacer(1); const lt = txt(cell, lavTxt(lv), Font.semiboldSystemFont(7), new Color(lv.col ? lv.col.hex : "#ff9f0a", dim ? 0.5 : 1)); lt.minimumScaleFactor = 0.6; }
       if (!(t && (t.mattina || t.sera))) {
+        cell.addSpacer();
         const e = evOn(s)[0];
-        if (e && fam === "large") { cell.addSpacer(1); txt(cell, e.nome, Font.systemFont(7), ACC); }
+        if (e && fam === "large") txt(cell, e.nome, Font.systemFont(7), ACC);
       }
-      cell.addSpacer();
     }
     if (r < rows - 1) w.addSpacer(2);
   }
