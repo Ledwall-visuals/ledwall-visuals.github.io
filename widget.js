@@ -17,6 +17,11 @@ const pad = n => String(n).padStart(2, "0");
 const ds = dt => dt.getFullYear() + "-" + pad(dt.getMonth() + 1) + "-" + pad(dt.getDate());
 const today = ds(new Date());
 const turni = {}; (d.turni || []).forEach(t => turni[t.data] = t);
+// chi non è admin vede nel calendario solo le domeniche in cui è di turno lui
+if (typeof SOLO_TURNI !== "undefined" && SOLO_TURNI && typeof IO !== "undefined" && IO) {
+  const io = IO.trim().split(/\s+/)[0].toLowerCase(), mio = n => !!n && n.trim().split(/\s+/)[0].toLowerCase() === io;
+  Object.keys(turni).forEach(k => { const t = turni[k]; turni[k] = { data: t.data, mattina: mio(t.mattina) ? t.mattina : "", sera: mio(t.sera) ? t.sera : "" }; });
+}
 const evOn = s => (d.eventi || []).filter(e => e.dal <= s && s <= e.al);
 const taskOn = s => (d.task || []).filter(t => t.scadenza === s);
 // Turni di lavoro dal Calendario dell'iPhone: calendario il cui nome contiene "lavoro" (o "work"),
@@ -26,7 +31,8 @@ const parti = String(args.widgetParameter || "").split(";").map(x => x.trim());
 const calNomi = ((parti.find(x => /^lavoro=/i.test(x)) || "").split("=")[1] || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
 const hm = dt => pad(dt.getHours()) + ":" + pad(dt.getMinutes());
 let lavoro = [];
-try {
+// i turni di lavoro li vede solo chi ha "const LAVORO = true" nello script (Benni)
+if (typeof LAVORO !== "undefined" && LAVORO) try {
   const cals = (await Calendar.forEvents()).filter(c => calNomi.length ? calNomi.includes(c.title.trim().toLowerCase()) : /^(mattin[ao]|pomeriggio|notte)$/i.test(c.title.trim()));
   if (cals.length) {
     const da = new Date(); da.setDate(1); da.setDate(da.getDate() - 7); da.setHours(0, 0, 0, 0);
@@ -54,45 +60,50 @@ function intervallo(l) {
 // barra dei turni di lavoro su una settimana: una riga continua da lunedì all'ora di inizio fino all'ora di fine
 function barreSettimana(lunedi, larg, alt, cw, gap, celle) {
   const c = new DrawContext(); c.size = new Size(larg, alt); c.opaque = false; c.respectScreenScale = true;
-  // sfondo delle celle disegnato qui sotto, così le barre stanno sopra e restano piene
+  // sfondo delle celle disegnato qui sotto, così le barre stanno sopra
   (celle || []).forEach((k, i) => { if (!k) return; const p = new Path(); p.addRoundedRect(new Rect(i * (cw + gap), 0, cw, alt), 6, 6); c.addPath(p); c.setFillColor(new Color("#ffffff", k === "dim" ? 0.03 : 0.08)); c.fillPath(); });
   const t0 = new Date(lunedi); t0.setHours(0, 0, 0, 0); const t1 = new Date(t0); t1.setDate(t1.getDate() + 7);
   const xOf = dt => { const g = (dt - t0) / 864e5; const di = Math.min(6, Math.max(0, Math.floor(g))); return Math.min(larg, Math.max(0, di * (cw + gap) + (g - di) * cw)); };
-  // mese corrente: la parte di barra fuori dal mese è trasparente, come i giorni del calendario
   const ora = new Date(), m0 = new Date(ora.getFullYear(), ora.getMonth(), 1), m1 = new Date(ora.getFullYear(), ora.getMonth() + 1, 1);
-  const xm0 = m0 <= t0 ? 0 : m0 >= t1 ? larg : xOf(m0), xm1 = m1 >= t1 ? larg : m1 <= t0 ? 0 : xOf(m1);
-  let n = 0;
-  // giorno di oggi: solo una cornice, disegnata sotto le barre
-  const oggi0 = new Date(); oggi0.setHours(0, 0, 0, 0); const gi = Math.round((oggi0 - t0) / 864e5);
-  if (gi >= 0 && gi < 7) { n++; const p = new Path(); p.addRoundedRect(new Rect(gi * (cw + gap) + 1, 1, cw - 2, alt - 2), 6, 6); c.addPath(p); c.setStrokeColor(new Color("#4f8cff")); c.setLineWidth(2); c.strokePath(); }
+  const xm0 = m0 <= t0 ? -1e4 : m0 >= t1 ? 1e4 : xOf(m0), xm1 = m1 >= t1 ? 1e4 : m1 <= t0 ? -1e4 : xOf(m1);
+  const y = Math.round(alt / 2 - 5), hb = 18;
+  // PIENO = 0.8: con la tinta di iOS le parti opache diventano bianche e la scritta sparirebbe
+  const PIENO = 0.8, DIM = 0.15, F = 70; // F = larghezza della sfumatura (circa un giorno e mezzo)
+  const liscio = t => t * t * (3 - 2 * t);
+  // trasparenza in base alla posizione: piena nel mese, sfuma dolcemente oltre il confine
+  const alfa = x => { const d = Math.max(xm0 - x, x - xm1, 0); if (d <= 0) return PIENO; if (d >= F) return DIM; return PIENO - (PIENO - DIM) * liscio(d / F); };
+  const barre = [];
   lavoro.forEach(l => {
     const [a, b] = intervallo(l); if (b <= t0 || a >= t1) return;
-    const x0 = xOf(a < t0 ? t0 : a), x1 = xOf(b > t1 ? t1 : b); if (x1 - x0 < 3) return; n++;
-    // barra al centro della riga: parte e finisce all'ora del turno, titolo in maiuscolo al centro
-    const col = l.col ? l.col.hex : "ff9f0a", y = Math.round(alt / 2 - 5), hb = 18;
-    const bar = (xa, xb, al) => { const p = new Path(); p.addRoundedRect(new Rect(xa, y, xb - xa, hb), 4, 4); c.addPath(p); c.setFillColor(new Color(col, al)); c.fillPath(); };
-    const ia = Math.max(x0, xm0), ib = Math.min(x1, xm1), dentro = ib - ia > 1;
-    // parte fuori dal mese: trasparente; parte nel mese: piena (gli angoli restano dritti sul confine del mese)
-    if (!dentro || ia > x0 || ib < x1) bar(x0, x1, 0.22);
-    // PIENO = 0.8: con la tinta di iOS le parti opache diventano bianche e la scritta sparirebbe
-    const PIENO = 0.8, DIM = 0.22, F = 26, fetta = 2;
-    if (dentro) {
-      bar(ia, ib, PIENO); c.setFillColor(new Color(col, PIENO));
-      if (ia > x0) c.fillRect(new Rect(ia, y, 4, hb)); if (ib < x1) c.fillRect(new Rect(ib - 4, y, 4, hb));
-      // sfumatura sul confine del mese: da pieno a trasparente
-      for (let k = 0; k < F; k += fetta) {
-        const al = PIENO - (PIENO - DIM) * (k + fetta) / F;
-        if (ib < x1 && ib + k < x1) { c.setFillColor(new Color(col, al - DIM)); c.fillRect(new Rect(ib + k, y, Math.min(fetta, x1 - ib - k), hb)); }
-        if (ia > x0 && ia - k - fetta > x0) { c.setFillColor(new Color(col, al - DIM)); c.fillRect(new Rect(ia - k - fetta, y, fetta, hb)); }
-      }
-    }
+    const x0 = xOf(a < t0 ? t0 : a), x1 = xOf(b > t1 ? t1 : b); if (x1 - x0 < 3) return;
+    barre.push([x0, x1]);
+    const col = l.col ? l.col.hex : "ff9f0a", r = 4;
+    // estremi arrotondati + fette da 1 pt in mezzo, ognuna con la sua trasparenza
+    [[x0, x0 + r * 2], [x1 - r * 2, x1]].forEach(([u, v]) => { const p = new Path(); p.addRoundedRect(new Rect(u, y, v - u, hb), r, r); c.addPath(p); c.setFillColor(new Color(col, alfa((u + v) / 2))); c.fillPath(); });
+    for (let x = x0 + r; x < x1 - r; x += 1) { c.setFillColor(new Color(col, alfa(x + 0.5))); c.fillRect(new Rect(x, y, Math.min(1.02, x1 - r - x), hb)); }
+    const ia = Math.max(x0, xm0), ib = Math.min(x1, xm1), dentro = ib - ia > 24;
     const ta = dentro ? ia : x0, tb = dentro ? ib : x1;
-    if (tb - ta > 24) { c.setFont(Font.heavySystemFont(8)); c.setTextColor(new Color("#ffffff", dentro ? 1 : 0.45)); c.setTextAlignedCenter(); c.drawTextInRect((l.cal || "Lavoro").toUpperCase(), new Rect(ta, y + 4, tb - ta, hb)); }
+    if (tb - ta > 24) { c.setFont(Font.heavySystemFont(8)); c.setTextColor(new Color("#ffffff", dentro ? 1 : 0.4)); c.setTextAlignedCenter(); c.drawTextInRect((l.cal || "Lavoro").toUpperCase(), new Rect(ta, y + 4, tb - ta, hb)); }
   });
+  // giorno di oggi: solo una cornice, interrotta dove passa una barra
+  const oggi0 = new Date(); oggi0.setHours(0, 0, 0, 0); const gi = Math.round((oggi0 - t0) / 864e5);
+  if (gi >= 0 && gi < 7) {
+    const L = gi * (cw + gap) + 1, R = L + cw - 2, T = 1, B = alt - 1, k = 6;
+    const sopra = barre.some(([u, v]) => u < R && v > L);
+    c.setStrokeColor(new Color("#4f8cff")); c.setLineWidth(2);
+    const arco = (pts) => { const p = new Path(); p.move(pts[0]); for (let q = 1; q < pts.length; q++) p.addLine(pts[q]); c.addPath(p); c.strokePath(); };
+    const P = (x, yy) => new Point(x, yy);
+    if (!sopra) { const p = new Path(); p.addRoundedRect(new Rect(L, T, cw - 2, alt - 2), k, k); c.addPath(p); c.strokePath(); }
+    else {
+      const ya = y - 2, yb = y + hb + 2;
+      arco([P(L, ya), P(L, T + k), P(L + 1.8, T + 1.8), P(L + k, T), P(R - k, T), P(R - 1.8, T + 1.8), P(R, T + k), P(R, ya)]);
+      arco([P(L, yb), P(L, B - k), P(L + 1.8, B - 1.8), P(L + k, B), P(R - k, B), P(R - 1.8, B - 1.8), P(R, B - k), P(R, yb)]);
+    }
+  }
   return c.getImage();
 }
 // prossima domenica (oggi compreso)
-const nx = (d.turni || []).find(t => t.data >= today);
+const nx = Object.values(turni).sort((a, b) => a.data.localeCompare(b.data)).find(t => t.data >= today && (t.mattina || t.sera));
 const nxNome = nx ? (nx.mattina === nx.sera ? first(nx.mattina) : [nx.mattina, nx.sera].filter(Boolean).map(first).join(" / ")) : "";
 
 function circle(nome, size, alpha) {

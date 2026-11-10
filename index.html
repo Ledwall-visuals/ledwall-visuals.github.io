@@ -696,6 +696,7 @@ function scriptable(){return `// Gestionale Ledwall – widget per Scriptable (s
 // Parametro del widget: calendario | task | checklist | checklist:Nome
 const FEED_TOKEN = "${FEEDTOK}";
 const SOLO_TURNI = ${!isAdmin()};
+const IO = "${esc(first(myName()))}";
 const CODE_URL = "https://api.github.com/repos/beniamincuric-design/Gestionale-ledwall/contents/widget.js";
 const fm = FileManager.local(), f = fm.joinPath(fm.documentsDirectory(), "ledwall-widget.js");
 let code;
