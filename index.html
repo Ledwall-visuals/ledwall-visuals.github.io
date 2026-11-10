@@ -241,7 +241,9 @@ let pubTimer=null, dirty=false, USER=null;
 let ANTEPRIMA=false; try{ANTEPRIMA=sessionStorage.getItem(KEY+'-ante')==='1'}catch(e){}
 function realAdmin(){return !!(USER&&USER.app_metadata&&USER.app_metadata.ruolo==='admin')}
 function isAdmin(){return realAdmin()&&!ANTEPRIMA}
-const VISTE_UTENTE=['calendario','task','inventario','assenze','backup'];
+// la configurazione della chiesa la modifica solo Benni
+const CHIESA_OWNER='921401e3-d2f3-4362-9e6b-869f88d468ae';function chiesaOwner(){return !!(USER&&USER.id===CHIESA_OWNER&&!ANTEPRIMA)}
+const VISTE_UTENTE=['chiesa','calendario','task','inventario','assenze','backup'];
 function setSt(t){const e=document.getElementById('saveSt');if(e)e.textContent=t}
 function save(){
   if(USER&&!isAdmin()){toast('Sola lettura');return}
@@ -430,12 +432,12 @@ function rememberUI(){try{sessionStorage.setItem(KEY+'-ui',JSON.stringify({view,
 function render(){
   const adm=isAdmin(); if(!adm){curEv=null;if(!VISTE_UTENTE.includes(view))view='calendario'}
   const TABS=adm?['calendario','eventi','turni','task','inventario','backup']:['calendario','task','inventario','assenze','backup'];
-  const attivo=TABS.includes(view)?view:'backup';
+  const attivo=TABS.includes(view)?view:view==='chiesa'?'calendario':'backup';
   document.querySelectorAll('#nav button').forEach(b=>{b.classList.toggle('on',b.dataset.v===attivo);b.style.display=TABS.includes(b.dataset.v)?'':'none'});
   const pb=document.getElementById('pwbtn');if(pb&&USER)pb.textContent=initials(myName());
   const app=document.getElementById('app');
   app.innerHTML = (ANTEPRIMA&&realAdmin()?`<div class="card" style="border:1px solid var(--acc)"><div class="row"><b>👁 Anteprima: vedi il sito come Lucas, Matteo ed Edo</b><span class="sp"></span><button class="btn sm" data-ante="0">Esci dall'anteprima</button></div></div>`:'')
-    + (curEv? vEvent(curEv) : ({eventi:vEvents,inventario:adm?vInv:vInvRO,assenze:vAssenze,calendario:vHome,registro:vLog,backup:adm?vBackup:vWidget,task:vTask,turni:vTurni}[view]||vCal)());
+    + (curEv? vEvent(curEv) : ({eventi:vEvents,inventario:adm?vInv:vInvRO,assenze:vAssenze,calendario:vHome,chiesa:vChiesa,registro:vLog,backup:adm?vBackup:vWidget,task:vTask,turni:vTurni}[view]||vCal)());
   app.classList.toggle('wide',!!curEv);document.documentElement.classList.toggle('evpage',!!curEv);{const tl=app.querySelector('.evtopL'),tr=app.querySelector('.evtopR');document.getElementById('navL').innerHTML=curEv&&tl?tl.innerHTML:'';document.getElementById('navR').innerHTML=curEv&&tr?tr.innerHTML:''}if(curEv)scrollTo(0,0);
   bind(); drawPresence(); if(typeof track==='function'&&CH)track();
 }
@@ -506,6 +508,7 @@ function status(ev){
 /* ---------- Dettaglio evento ---------- */
 function vEvent(id){
   const ev=DB.events.find(e=>e.id===id); if(!ev){curEv=null;return vEvents()}
+  if(ev.id==='chiesa'&&!chiesaOwner()){curEv=null;view='chiesa';return vChiesaRO()}
   const leds=DB.items.filter(i=>i.cat==='led');
   if(window.SCROPEN===undefined||window.SCREV!==ev.id){window.SCROPEN=(ev.screens||[]).length?0:-1;window.SCREV=ev.id}
   if(window.SCROPEN>=(ev.screens||[]).length)window.SCROPEN=(ev.screens||[]).length-1;
@@ -543,6 +546,7 @@ function vEvent(id){
   if(!(ev.screens||[]).length)L+=`<p class="mut">Nessuno schermo: crealo qui sopra.</p>`;
   (ev.screens||[]).forEach((x,k)=>{L+=`<div class="screen scrrow" data-scropen="${k}" style="${k===i?'border:1px solid var(--acc)':''}"><div class="row" style="flex-wrap:nowrap"><b style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.name||'Schermo')}</b><span class="mut">${k===i?'●':'›'}</span></div></div>`});
   L+=`</div>`;
+  if((ev.screens||[]).length>1)C+=pmAllCard(ev);
   if(s){C+=`<div class="card" data-scr="${i}"><h2>${esc(s.name||'Schermo')}</h2>`;
     let h='';
     if(c){ h+=`<div class="kpi kpi6">
@@ -787,6 +791,7 @@ function pmCab(g,c,t,scr,cab){
 function pmScreen(i){const ev=curEv&&DB.events.find(x=>x.id===curEv);const s0=ev&&ev.screens[+i];const c=s0&&screenCalc(s0);return c&&c.pxW&&c.pxH?{s:{...s0,_i:+i},c,ev}:null}
 (function pmAnim(){const t=(performance.now()/1000)%PM_LOOP;
   document.querySelectorAll('canvas[data-pm]').forEach(cv=>{const o=pmScreen(cv.dataset.pm);if(o)pmDraw(cv.getContext('2d'),o.c,t,o.s)});
+  document.querySelectorAll('canvas[data-pmall]').forEach(cv=>pmAllDraw(cv,t));
   requestAnimationFrame(pmAnim)})();
 function pmFile(o,ext){return `pixelmap-${(o.s.name||'schermo').replace(/[^\w-]+/g,'_')}-${o.c.pxW}x${o.c.pxH}.${ext}`}
 function pmSave(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000)}
@@ -864,6 +869,32 @@ document.addEventListener('change',e=>{const t=e.target;if(!t.dataset||!t.datase
   const S=new Set((o.s.off||[]).filter(x=>x.split(',')[1]!==r));for(let k=0;k<c.cols;k++)if(k<a||k>b)S.add(k+','+r);o.s.off=[...S];
   cabSave(o,`forma fila ${+r+1}: colonne ${a+1}–${b+1}`);render()});
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-formaall]');if(!b)return;const o=cabScr(b.dataset.formaall);if(!o)return;o.s.off=[];cabSave(o,'accesi tutti i moduli');render()});
+
+/* ---------- Configurazione completa (tutti gli schermi insieme) ---------- */
+function pmAllInfo(ev){const L=(ev.screens||[]).map((s,k)=>({s:{...s,_i:k},c:screenCalc(s)})).filter(o=>o.c&&o.c.pxW&&o.c.pxH);
+  const gap=L.length>1?Math.round(Math.max(...L.map(o=>o.c.it.pxW))*.5):0, W=L.reduce((a,o)=>a+o.c.pxW,0), H=L.length?Math.max(...L.map(o=>o.c.pxH)):0;
+  return {L,gap,W,H,Wv:W+gap*Math.max(0,L.length-1)}}
+function pmAllCard(ev){const A=pmAllInfo(ev);if(!A.L.length)return '';const k=Math.min(1,900/A.Wv,300/A.H),dw=Math.round(A.Wv*k),dh=Math.round(A.H*k);
+  return `<div class="card"><div class="row"><h2 style="margin:0">🧩 Configurazione completa</h2><span class="sp"></span><span class="mut">${A.W} × ${A.H} px · ${A.L.reduce((a,o)=>a+o.c.mods,0)} moduli</span></div>
+  <div class="pmbox"><canvas class="pm" data-pmall="${ev.id}" width="${dw*2}" height="${dh*2}" style="width:${dw}px;max-width:100%"></canvas></div>
+  <div class="mut" style="margin-top:6px">${A.L.map(o=>`<b>${esc(o.s.name||'Schermo')}</b> ${o.c.pxW}×${o.c.pxH} px`).join(' · ')} — sul canvas gli schermi sono uno accanto all'altro, senza spazio.</div></div>`}
+const PMALL_TMP={};
+function pmAllDraw(cv,t){const ev=DB.events.find(x=>x.id===cv.dataset.pmall);if(!ev)return;const A=pmAllInfo(ev);const g=cv.getContext('2d');
+  g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,cv.width,cv.height);const k=cv.width/A.Wv;let x=0;
+  A.L.forEach((o,n)=>{const w=Math.max(1,Math.round(o.c.pxW*k)),h=Math.max(1,Math.round(o.c.pxH*k));const tc=PMALL_TMP[n]||(PMALL_TMP[n]=document.createElement('canvas'));if(tc.width!==w||tc.height!==h){tc.width=w;tc.height=h}
+    pmDraw(tc.getContext('2d'),o.c,t,o.s);g.drawImage(tc,Math.round(x),0);x+=(o.c.pxW+A.gap)*k})}
+function vChiesa(){const ev=DB.events.find(x=>x.id==='chiesa');
+  if(chiesaOwner()){if(!ev)return `<div class="card"><h2>⛪ Ledwall chiesa</h2><p class="mut">Non ancora creata.</p><button class="btn" data-act="chiesa">Crea configurazione</button></div>`;curEv='chiesa';return vEvent('chiesa')}
+  return vChiesaRO()}
+function vChiesaRO(){const ev=DB.events.find(x=>x.id==='chiesa');
+  if(!ev)return `<div class="card"><h2>⛪ Ledwall chiesa</h2><p class="mut">Benni non ha ancora creato la configurazione.</p></div>`;
+  const A=pmAllInfo(ev), W=A.L.reduce((a,o)=>a+o.c.watt,0);
+  return `<div class="hello"><h2>⛪ Ledwall chiesa</h2><p>Solo lettura · la modifica solo Benni</p></div>${pmAllCard(ev)}
+  ${A.L.map(o=>`<div class="card"><h2>${esc(o.s.name||'Schermo')}</h2><div class="kpi">
+    <div><b>${o.c.cols} × ${o.c.rows}</b><span>colonne × file</span></div><div><b>${o.c.mods}</b><span>moduli accesi</span></div>
+    <div><b>${o.c.pxW} × ${o.c.pxH}</b><span>risoluzione px</span></div><div><b>${o.c.mW.toFixed(2)} × ${o.c.mH.toFixed(2)} m</b><span>misura</span></div>
+    <div><b>${(o.c.watt/1000).toFixed(1)} kW</b><span>consumo max</span></div><div><b>${esc(o.c.it.name)}</b><span>${o.c.it.pxW}×${o.c.it.pxH} px per modulo</span></div></div></div>`).join('')}
+  <div class="card"><div class="kpi"><div><b>${A.W} × ${A.H} px</b><span>canvas totale</span></div><div><b>${(W/1000).toFixed(1)} kW</b><span>consumo max totale</span></div></div></div>`}
 /* ---------- Home ---------- */
 function vHome(){
   const adm=isAdmin(), oggi=oggiS(), me=first(myName());
@@ -884,8 +915,10 @@ function vHome(){
   // task
   const tasks=taskAperti();
   const tkCard=`<div class="card"><div class="eyebrow">✅ Task <span class="sp"></span><button class="link" data-gov="task">Tutti →</button></div>${tasks.slice(0,5).map(x=>`<div class="task"><input type="checkbox" data-atdone="${x.id}"><div style="flex:1;min-width:0"><div class="tt">${x.comune?'':'🔒 '}${esc(x.testo)}</div>${x.chi||x.scadenza?`<div class="mut">${x.chi?esc(x.chi):''}${x.chi&&x.scadenza?' · ':''}${x.scadenza?`<span class="${x.scadenza<oggi?'bad':''}">${new Date(x.scadenza+'T12:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</span>`:''}</div>`:''}</div></div>`).join('')||'<p class="mut" style="margin:0">Niente da fare 🎉</p>'}${tasks.length>5?`<div class="mut" style="margin-top:8px">+ altri ${tasks.length-5}</div>`:''}</div>`;
+  const ch=DB.events.find(x=>x.id==='chiesa'), chS=ch?(ch.screens||[]).map(screenCalc).filter(Boolean):[];
+  const chCard=`<div class="card" data-gov="chiesa" style="cursor:pointer"><div class="eyebrow">⛪ Ledwall chiesa<span class="sp"></span><span class="chev">›</span></div>${chS.length?`<div class="who" style="font-size:20px">${chS.reduce((a,c)=>a+c.pxW,0)} × ${Math.max(...chS.map(c=>c.pxH))} px</div><div class="mut">${chS.length} schermi · ${chS.reduce((a,c)=>a+c.mods,0)} moduli</div>`:'<div class="mut">Configurazione non ancora creata</div>'}</div>`;
   return `<div class="hello"><h2>${saluto}, ${esc(me)}</h2><p style="text-transform:capitalize">${dataLunga}</p></div>
-  <div class="hgrid"><div class="wide">${vCal()}</div><div class="side">${hero}${evCard}${tkCard}</div></div>`;
+  <div class="hgrid"><div class="wide">${vCal()}</div><div class="side">${hero}${chCard}${evCard}${tkCard}</div></div>`;
 }
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-gov]');if(!b)return;view=b.dataset.gov;curEv=null;rememberUI();render();scrollTo(0,0)});
 /* ---------- Task e checklist ---------- */
@@ -1004,7 +1037,7 @@ function bind(){
         if(cat==='led')Object.assign(it,{name:'Nuovo modulo LED',modPerCase:6,modW:500,modH:1000,pxW:192,pxH:384,kg:7.5,watt:180});
         stamp(it);DB.items.unshift(it);logChange(`Aggiunto articolo in ${CATS[cat]}`)},
       async delItem(){const it=item(a.dataset.id);if(await ask('Eliminare questo articolo?')){DB.items=DB.items.filter(i=>i.id!==a.dataset.id);logChange(`Eliminato articolo "${it&&it.name}"`)}else return 'nosave'},
-      chiesa(){let c=DB.events.find(x=>x.id==='chiesa');let l=DB.items.find(i=>i.cat==='led'&&+i.pxW===192&&+i.pxH===384);
+      chiesa(){if(!chiesaOwner()){view='chiesa';curEv=null;rememberUI();return 'nosave'}let c=DB.events.find(x=>x.id==='chiesa');let l=DB.items.find(i=>i.cat==='led'&&+i.pxW===192&&+i.pxH===384);
         if(!l){l={id:uid(),cat:'led',name:'Moduli P2.6 (chiesa)',qty:118,modPerCase:6,modW:500,modH:1000,pxW:192,pxH:384,kg:13,watt:200,autoPer:'none',autoQty:0,note:'Ledwall fisso della chiesa. Peso e consumo stimati: da controllare.'};stamp(l);DB.items.push(l);logChange('Aggiunto in inventario: Moduli P2.6 (chiesa)')}
         if(c&&c.screens[0]){const s0=c.screens[0],cur=item(s0.ledId);if(!cur||+cur.pxW!==192||+cur.pxH!==384){s0.ledId=l.id;stamp(c)}}
         if(!c){const off=[];for(let k=0;k<52;k++)if(k<16||k>29)off.push(k+',2');
