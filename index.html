@@ -531,9 +531,9 @@ function vEvent(id){
       <p class="mut" style="margin:6px 0 0">Scegli la porta e passa col mouse (tieni premuto) o col dito sui moduli nell'ordine dei cavi. Tocca di nuovo un modulo per toglierlo.</p></div>`:''}
       ${s.cabMode==='man'?'':`<div><label>Partenza</label><select data-sf="cabStart">${[['BL','In basso a sinistra'],['BR','In basso a destra'],['TL','In alto a sinistra'],['TR','In alto a destra']].map(([v,l])=>`<option value="${v}" ${(s.cabStart||'BL')===v?'selected':''}>${l}</option>`).join('')}</select></div>
       <div><label>Direzione</label><select data-sf="cabDir"><option value="col" ${(s.cabDir||'col')==='col'?'selected':''}>Per colonne ↕</option><option value="row" ${s.cabDir==='row'?'selected':''}>Per file ↔</option></select></div>`}
-      <div><label>Pixel max per porta</label><input type="number" data-sf="cabPx" value="${s.cabPx||650000}"></div>
-      <div><label>Ampere per linea</label><input type="number" data-sf="cabA" value="${s.cabA||16}"></div>
-      <div style="grid-column:1/-1" class="mut">${cp.troppi.length?`<span class="bad">⚠️ Troppi moduli su ${cp.troppi.map(n=>'P'+n).join(', ')} (max ${cp.mpp})</span> · `:''}${s.cabMode==='man'&&cp.liberi?`<span class="bad">${cp.liberi} moduli senza cavo</span> · `:''}🔌 <b>${cp.ports}</b> porte dati (max ${cp.mpp} moduli per porta) · ⚡ <b>${cp.lines}</b> linee di corrente da ${cp.A} A (max ${cp.mpl} moduli per linea${+c.it.watt?'':', manca il consumo del modulo'})</div>`})():''}</div></div>`;
+      <div><label>Moduli max per porta</label><input type="number" step="1" min="1" data-sf="cabMpp" value="${s.cabMpp||12}"></div>
+      <div><label>Distributore corrente</label><select data-sf="cabA">${[32,64].map(a=>`<option value="${a}" ${(+s.cabA||32)===a?'selected':''}>${a} A</option>`).join('')}</select></div>
+      <div style="grid-column:1/-1" class="mut">${cp.troppi.length?`<span class="bad">⚠️ Troppi moduli su ${cp.troppi.map(n=>'P'+n).join(', ')} (max ${cp.mpp})</span> · `:''}${s.cabMode==='man'&&cp.liberi?`<span class="bad">${cp.liberi} moduli senza cavo</span> · `:''}🔌 <b>${cp.ports}</b> porte dati (max ${cp.mpp} moduli per porta) · ⚡ <b>${cp.lines}</b> distributor${cp.lines>1?'i':'e'} da ${cp.A} A (max ${cp.mpl} moduli ciascuno${+c.it.watt?'':', manca il consumo del modulo'})</div>`})():''}</div></div>`;
     } else h+=`<p class="bad">Aggiungi prima un tipo di cassa LED nell'inventario.</p>`;
     h+='</div>';
   });
@@ -660,11 +660,11 @@ const PM_LOOP=4; // secondi di un giro del radar = durata del loop
 const CAB_COL=['#ffd60a','#0a84ff','#ff375f','#30d158','#bf5af2','#ff9f0a','#64d2ff','#ffffff'];
 // cablaggio a serpentina: ordine dei moduli, porte dati (pixel max per porta) e linee di corrente (ampere)
 function cabPlan(c,s){
-  const start=s.cabStart||'BL', dir=s.cabDir||'col', px=+s.cabPx||650000, A=+s.cabA||16, watt=+c.it.watt||0;
+  const start=s.cabStart||'BL', dir=s.cabDir||'col', A=+s.cabA||32, watt=+c.it.watt||0;
   const fromRight=start[1]==='R', fromBottom=start[0]==='B', order=[];
   if(dir==='col'){for(let a=0;a<c.cols;a++){const k=fromRight?c.cols-1-a:a;for(let b=0;b<c.rows;b++){const up=(a%2===0)===fromBottom;order.push([k,up?c.rows-1-b:b])}}}
   else{for(let a=0;a<c.rows;a++){const r=fromBottom?c.rows-1-a:a;for(let b=0;b<c.cols;b++){const lr=(a%2===0)!==fromRight;order.push([lr?b:c.cols-1-b,r])}}}
-  const mpp=Math.max(1,Math.floor(px/(c.it.pxW*c.it.pxH)));
+  const mpp=Math.max(1,Math.round(+s.cabMpp||12));
   let chains=[];
   if(s.cabMode==='man')chains=((s.cabMan&&s.cabMan.ports)||[[]]).map(ch=>ch.filter(([k,r])=>k<c.cols&&r<c.rows));
   else for(let i=0;i<order.length;i+=mpp)chains.push(order.slice(i,i+mpp));
