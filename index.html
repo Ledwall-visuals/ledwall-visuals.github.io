@@ -50,6 +50,11 @@ label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
 .kpi span{color:var(--mut);font-size:12px}
 .screen{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
 .preview{display:grid;gap:2px;margin-top:10px;max-width:100%;overflow:auto}
+.evgrid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+.evgrid>div>.card{margin-bottom:16px}
+@media(max-width:1099px){.evgrid>.evc{order:1}.evgrid>.evl{order:2}.evgrid>.evr{order:3}}
+@media(min-width:1100px){main.wide{max-width:1760px}.evgrid{grid-template-columns:300px minmax(0,1fr) 360px;align-items:start}.evgrid>.evl,.evgrid>.evr{position:sticky;top:110px;max-height:calc(100vh - 120px);overflow:auto}}
+.mat{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:.5px solid var(--line)}.mat:last-child{border:0}
 .pmbox{margin-top:12px}.scrrow{cursor:pointer}.scrrow:hover{background:var(--panel2)}.pm{display:block;max-width:100%;height:auto;margin:0 auto;border-radius:10px;background:#000}
 .preview i{display:block;background:#2a4f8f;border-radius:2px}
 .evlist .ev{display:flex;gap:12px;align-items:center;padding:10px;border-bottom:1px solid var(--line);cursor:pointer}
@@ -427,6 +432,7 @@ function render(){
   const app=document.getElementById('app');
   app.innerHTML = (ANTEPRIMA&&realAdmin()?`<div class="card" style="border:1px solid var(--acc)"><div class="row"><b>👁 Anteprima: vedi il sito come Lucas, Matteo ed Edo</b><span class="sp"></span><button class="btn sm" data-ante="0">Esci dall'anteprima</button></div></div>`:'')
     + (curEv? vEvent(curEv) : ({eventi:vEvents,inventario:adm?vInv:vInvRO,assenze:vAssenze,calendario:vHome,registro:vLog,backup:adm?vBackup:vWidget,task:vTask,turni:vTurni}[view]||vCal)());
+  app.classList.toggle('wide',!!curEv);
   bind(); drawPresence(); if(typeof track==='function'&&CH)track();
 }
 
@@ -496,9 +502,27 @@ function status(ev){
 function vEvent(id){
   const ev=DB.events.find(e=>e.id===id); if(!ev){curEv=null;return vEvents()}
   const leds=DB.items.filter(i=>i.cat==='led');
+  if(window.SCROPEN===undefined||window.SCREV!==ev.id){window.SCROPEN=(ev.screens||[]).length?0:-1;window.SCREV=ev.id}
+  if(window.SCROPEN>=(ev.screens||[]).length)window.SCROPEN=(ev.screens||[]).length-1;
+  const i=window.SCROPEN, s=i>=0?ev.screens[i]:null, c=s?screenCalc(s):null;
   let h=`<div class="row noprint" style="margin-bottom:12px"><button class="btn sec" data-act="back">← Eventi</button><span class="sp"></span>
-    <button class="btn sec" data-act="dupEv">Duplica</button>${IN_FRAME?'':'<button class="btn sec" onclick="window.print()">🖨️ Stampa</button>'}<button class="btn bad" data-act="delEv">Elimina</button></div>
-  <div class="card" data-ev="${ev.id}"><h2>Dati evento</h2>${byLine(ev)}<div class="grid">
+    <button class="btn sec" data-act="dupEv">Duplica</button>${IN_FRAME?'':'<button class="btn sec" onclick="window.print()">🖨️ Stampa</button>'}<button class="btn bad" data-act="delEv">Elimina</button></div><div class="evgrid">`;
+
+  // ===== SINISTRA: crea / modifica schermo =====
+  let L=`<div class="card"><div class="row"><h2 style="margin:0">${s?'✏️ Schermo':'Schermi'}</h2><span class="sp"></span><button class="btn noprint" data-act="addScreen">+ Nuovo</button></div>`;
+  if(s&&window.SCREDIT!==false){L+=`<div class="grid" data-scr="${i}" style="grid-template-columns:1fr 1fr;margin-top:10px"><div><label>Nome</label><input data-sf="name" value="${esc(s.name)}"></div>
+      <div style="grid-column:span 2"><label>Tipo LED</label><select data-sf="ledId">${leds.map(l=>`<option value="${l.id}" ${s.ledId===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select></div>
+      <div><label>Unità</label><select data-sf="mode"><option value="moduli" ${s.mode!=='metri'?'selected':''}>moduli</option><option value="metri" ${s.mode==='metri'?'selected':''}>metri</option></select></div>
+      <div><label>Larghezza</label><input type="number" step="${s.mode==='metri'?0.5:1}" min="0" data-sf="w" value="${s.w}"></div>
+      <div><label>Altezza</label><input type="number" step="1" min="0" data-sf="h" value="${s.h}"></div>
+      </div>
+    <p class="mut" style="margin:10px 0 6px">In <b>moduli</b> (es. 3×2) o in <b>metri</b> (arrotondato per eccesso).</p>
+    <div class="row noprint" style="margin-top:8px"><button class="btn sm" data-scrclose="1">✓ Salva</button><span class="sp"></span><button class="btn bad sm" data-act="delScreen" data-i="${i}">Rimuovi</button></div>`}
+  else L+=`<p class="mut">${s?'Tocca uno schermo nella lista per modificarlo, oppure ':'Premi '}<b>+ Nuovo</b> per crearne uno.</p>`;
+  L+=`<p class="mut" style="margin-top:12px">Scorta moduli di riserva: <input type="number" min="0" id="scorta" value="${DB.settings.scorta}" style="width:70px;display:inline-block"> %</p></div>`;
+
+  // ===== CENTRO: dati evento, schermi creati, info, pixelmap e cablaggio =====
+  let C=`<div class="card" data-ev="${ev.id}"><h2>Dati evento</h2>${byLine(ev)}<div class="grid">
     <div style="grid-column:span 2"><label>Nome</label><input data-ef="name" value="${esc(ev.name)}"></div>
     <div style="grid-column:span 2"><label>Luogo</label><input data-ef="place" value="${esc(ev.place)}"></div>
     <div><label>Dal</label><input type="date" data-ef="start" value="${ev.start||''}"></div>
@@ -507,19 +531,13 @@ function vEvent(id){
     <div><label>Smontaggio (data/ora)</label><input type="datetime-local" data-ef="teardown" value="${ev.teardown||''}"></div>
     <div style="grid-column:1/-1"><label>Note (referente, orari, accesso, corrente disponibile...)</label><textarea data-ef="notes">${esc(ev.notes)}</textarea></div>
   </div></div>
-  <div class="card"><div class="row"><h2 style="margin:0">Schermi</h2><span class="sp"></span><button class="btn noprint" data-act="addScreen">+ Schermo</button></div>
-  <p class="mut">Scegli se le misure sono in <b>moduli</b> (es. 3×2 moduli) o in <b>metri</b> (es. 3×2 m, arrotondato per eccesso). Scorta moduli di riserva: <input type="number" min="0" id="scorta" value="${DB.settings.scorta}" style="width:70px;display:inline-block"> %</p>`;
-  if(window.SCROPEN===undefined||window.SCREV!==ev.id){window.SCROPEN=(ev.screens||[]).length?0:-1;window.SCREV=ev.id}
-  (ev.screens||[]).forEach((s,i)=>{
-    const c=screenCalc(s);
-    if(i!==window.SCROPEN){h+=`<div class="screen scrrow" data-scropen="${i}"><div class="row" style="flex-wrap:nowrap"><div style="flex:1;min-width:0"><b>${esc(s.name||'Schermo')}</b><div class="mut">${c?`${c.cols}×${c.rows} moduli · ${c.mW.toFixed(1)}×${c.mH.toFixed(1)} m · ${c.pxW}×${c.pxH} px · ${(c.watt/1000).toFixed(1)} kW`:'—'}</div></div><span class="mut" style="font-size:20px">›</span></div></div>`;return}
-    h+=`<div class="screen" data-scr="${i}" style="border:1px solid var(--acc)"><div class="row noprint" style="margin-bottom:8px"><b style="flex:1">✏️ ${esc(s.name||'Schermo')}</b><button class="btn sm" data-scrclose="1">✓ Fatto</button></div><div class="grid">
-      <div><label>Nome</label><input data-sf="name" value="${esc(s.name)}"></div>
-      <div style="grid-column:span 2"><label>Tipo LED</label><select data-sf="ledId">${leds.map(l=>`<option value="${l.id}" ${s.ledId===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select></div>
-      <div><label>Unità</label><select data-sf="mode"><option value="moduli" ${s.mode!=='metri'?'selected':''}>moduli</option><option value="metri" ${s.mode==='metri'?'selected':''}>metri</option></select></div>
-      <div><label>Larghezza</label><input type="number" step="${s.mode==='metri'?0.5:1}" min="0" data-sf="w" value="${s.w}"></div>
-      <div><label>Altezza</label><input type="number" step="1" min="0" data-sf="h" value="${s.h}"></div>
-      <div style="align-self:end" class="noprint"><button class="btn bad sm" data-act="delScreen" data-i="${i}">Rimuovi</button></div></div>`;
+  <div class="card"><h2>Schermi dell'evento</h2>`;
+  if(!(ev.screens||[]).length)C+=`<p class="mut">Nessuno schermo: crealo nella colonna a sinistra.</p>`;
+  (ev.screens||[]).forEach((x,k)=>{const cx=screenCalc(x);C+=`<div class="screen scrrow" data-scropen="${k}" style="${k===i?'border:1px solid var(--acc)':''}"><div class="row" style="flex-wrap:nowrap"><div style="flex:1;min-width:0"><b>${esc(x.name||'Schermo')}</b><div class="mut">${cx?`${cx.cols}×${cx.rows} moduli · ${cx.mW.toFixed(1)}×${cx.mH.toFixed(1)} m · ${cx.pxW}×${cx.pxH} px · ${(cx.watt/1000).toFixed(1)} kW`:'—'}</div></div><span class="mut" style="font-size:20px">${k===i?'●':'›'}</span></div></div>`});
+  {const W=(ev.screens||[]).map(screenCalc).filter(Boolean).reduce((a,c)=>a+c.watt,0);if(W&&(ev.screens||[]).length>1)C+=`<div class="kpi"><div><b>${(W/1000).toFixed(1)} kW</b><span>consumo max di tutti gli schermi · ~${Math.ceil(W/(Math.sqrt(3)*400))} A per fase in trifase · ${psa(W)} distributor${psa(W)>1?'i':'e'}</span></div></div>`}
+  C+=`</div>`;
+  if(s){C+=`<div class="card" data-scr="${i}"><h2>${esc(s.name||'Schermo')}</h2>`;
+    let h='';
     if(c){ h+=`<div class="kpi">
       <div><b>${c.cols} × ${c.rows}</b><span>moduli (col × file)</span></div>
       <div><b>${c.cases}</b><span>casse da ${c.it.modPerCase} (${c.mods} moduli${c.scorta?` + ${c.scorta} scorta`:''}${c.leftover?`, ${c.leftover} posti liberi`:''})</span></div>
@@ -545,27 +563,23 @@ function vEvent(id){
 
       <div style="grid-column:1/-1" class="mut">${cp.troppi.length?`<span class="bad">⚠️ Troppi moduli su ${cp.troppi.map(n=>'P'+n).join(', ')} (max ${cp.mpp})</span> · `:''}${s.cabMode==='man'&&cp.liberi?`<span class="bad">${cp.liberi} moduli senza cavo</span> · `:''}🔌 <b>${cp.ports}</b> porte dati (max ${cp.mpp} moduli per porta)</div>`})():''}</div></div>`;
     } else h+=`<p class="bad">Aggiungi prima un tipo di cassa LED nell'inventario.</p>`;
-    h+='</div>';
-  });
-  {const W=(ev.screens||[]).map(screenCalc).filter(Boolean).reduce((a,c)=>a+c.watt,0);if(W&&(ev.screens||[]).length>1)h+=`<div class="kpi"><div><b>${(W/1000).toFixed(1)} kW</b><span>consumo max di tutti gli schermi · ~${Math.ceil(W/(Math.sqrt(3)*400))} A per fase in trifase · ${psa(W)} distributor${psa(W)>1?'i':'e'}</span></div></div>`}
-  h+=`</div>`;
+    C+=h+`</div>`}
 
-  // materiale
+  // ===== DESTRA: materiale necessario e checklist =====
   const n=needs(ev);
-  h+=`<div class="card"><div class="row"><h2 style="margin:0">Materiale necessario & checklist carico</h2><span class="sp"></span>
-    <select id="extraSel" class="noprint" style="width:auto">${DB.items.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select>
-    <input id="extraQty" class="noprint" type="number" value="1" min="1" style="width:70px"><button class="btn sec noprint" data-act="addExtra">+ Aggiungi a mano</button></div>
-    <table class="check"><tr><th>✓</th><th>Materiale</th><th>Serve</th><th>Disponibile</th><th>Stato</th><th>Calcolo</th></tr>`;
   const keys=Object.keys(n).sort((a,b)=>Object.keys(CATS).indexOf(item(a)?.cat)-Object.keys(CATS).indexOf(item(b)?.cat));
-  keys.forEach(id=>{const it=item(id); if(!it)return; const x=n[id]; const other=usedElsewhere(ev,id); const avail=it.qty-other; const done=ev.checked?.[id];
-    h+=`<tr class="${done?'done':''}"><td><input type="checkbox" data-chk="${id}" ${done?'checked':''}></td><td>${esc(it.name)}<div class="mut">${CATS[it.cat]}</div></td>
-    <td><b>${x.qty}</b> ${it.cat==='led'?'casse':'pz'}</td><td>${avail}${other?` <span class="mut">(${other} impegnati in altri eventi)</span>`:''}</td>
-    <td>${x.qty<=avail?'<span class="tag ok">OK</span>':`<span class="tag bad">Mancano ${x.qty-avail}</span>`}</td><td class="mut">${x.why.map(esc).join('<br>')}</td></tr>`});
-  if(!keys.length) h+=`<tr><td colspan="6" class="mut">Aggiungi uno schermo per vedere il calcolo.</td></tr>`;
-  h+=`</table>`;
-  if((ev.extras||[]).length) h+=`<h3>Aggiunti a mano</h3>${ev.extras.map((x,i)=>`<span class="tag">${esc(item(x.itemId)?.name)} × ${x.qty} <a href="#" class="noprint" data-act="delExtra" data-i="${i}" style="color:var(--bad)">✕</a></span> `).join('')}`;
-  h+=`</div>`;
-  return h;
+  let R=`<div class="card"><h2>📦 Materiale necessario</h2>`;
+  keys.forEach(id=>{const it=item(id); if(!it)return; const x=n[id]; const other=usedElsewhere(ev,id); const avail=it.qty-other;
+    R+=`<div class="mat"><div style="flex:1;min-width:0"><b>${x.qty}</b> ${it.cat==='led'?'casse':'×'} ${esc(it.name)}<div class="mut">${x.why.map(esc).join(' · ')}</div><div class="mut">Disponibili ${avail}${other?` (${other} in altri eventi)`:''}</div></div>${x.qty<=avail?'<span class="tag ok">OK</span>':`<span class="tag bad">Mancano ${x.qty-avail}</span>`}</div>`});
+  if(!keys.length)R+=`<p class="mut">Crea uno schermo per vedere il calcolo.</p>`;
+  R+=`<div class="row noprint" style="margin-top:10px;gap:6px"><select id="extraSel" style="flex:1;min-width:0">${DB.items.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select><input id="extraQty" type="number" value="1" min="1" style="width:64px"><button class="btn sec sm" data-act="addExtra">+ Aggiungi</button></div>`;
+  if((ev.extras||[]).length)R+=`<div style="margin-top:8px">${ev.extras.map((x,k)=>`<span class="tag">${esc(item(x.itemId)?.name)} × ${x.qty} <a href="#" class="noprint" data-act="delExtra" data-i="${k}" style="color:var(--bad)">✕</a></span> `).join('')}</div>`;
+  R+=`</div>`;
+  const fatti=keys.filter(id=>ev.checked?.[id]).length;
+  R+=`<div class="card"><div class="row"><h2 style="margin:0">✅ Checklist carico</h2><span class="sp"></span><span class="tag ${fatti===keys.length&&fatti?'ok':''}">${fatti}/${keys.length}</span></div>
+    ${keys.map(id=>{const it=item(id);if(!it)return'';const done=ev.checked?.[id];return `<div class="task${done?' fatto':''}"><input type="checkbox" data-chk="${id}" ${done?'checked':''}><div class="tt" style="flex:1"><b>${n[id].qty}</b> ${it.cat==='led'?'casse':'×'} ${esc(it.name)}</div></div>`}).join('')||'<p class="mut">Niente da caricare.</p>'}</div>`;
+
+  return h+`<div class="evl">${L}</div><div class="evc">${C}</div><div class="evr">${R}</div></div>`;
 }
 
 /* ---------- Calendario ---------- */
@@ -811,7 +825,7 @@ document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest
   render()});
 
 document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('[data-scropen],[data-scrclose]');if(!a)return;
-  window.SCROPEN=a.dataset.scrclose?-1:+a.dataset.scropen;render();
+  if(a.dataset.scrclose){window.SCREDIT=false;toast('Schermo salvato ✓')}else{window.SCROPEN=+a.dataset.scropen;window.SCREDIT=true}render();
   if(a.dataset.scropen!==undefined)setTimeout(()=>{const el=document.querySelector(`[data-scr="${window.SCROPEN}"]`);el&&el.scrollIntoView({behavior:'smooth',block:'start'})},0)});
 /* ---------- Home ---------- */
 function vHome(){
@@ -957,7 +971,7 @@ function bind(){
       back(){curEv=null;view='eventi';rememberUI();render();return 'nosave'},
       async delEv(){if(await ask('Eliminare l\'evento?')){logChange(`Eliminato evento "${ev.name}"`);DB.events=DB.events.filter(x=>x.id!==curEv);curEv=null}else return 'nosave'},
       dupEv(){const c=JSON.parse(JSON.stringify(ev));c.id=uid();c.name+=' (copia)';c.checked={};stamp(c);DB.events.push(c);curEv=c.id;logChange(`Duplicato evento "${ev.name}"`)},
-      addScreen(){const l=DB.items.find(i=>i.cat==='led');ev.screens.unshift({name:'Schermo '+(ev.screens.length+1),ledId:l?.id,mode:'moduli',w:3,h:2});window.SCROPEN=0;stamp(ev);logChange(`Evento "${ev.name}": aggiunto schermo`)},
+      addScreen(){const l=DB.items.find(i=>i.cat==='led');ev.screens.unshift({name:'Schermo '+(ev.screens.length+1),ledId:l?.id,mode:'moduli',w:3,h:2});window.SCROPEN=0;window.SCREDIT=true;stamp(ev);logChange(`Evento "${ev.name}": aggiunto schermo`)},
       delScreen(){const sc=ev.screens[+a.dataset.i];ev.screens.splice(+a.dataset.i,1);window.SCROPEN=-1;stamp(ev);logChange(`Evento "${ev.name}": rimosso ${sc&&sc.name}`)},
       addExtra(){ev.extras=ev.extras||[];const x={itemId:document.getElementById('extraSel').value,qty:+document.getElementById('extraQty').value||1};ev.extras.push(x);stamp(ev);logChange(`Evento "${ev.name}": aggiunto a mano ${x.qty} × ${item(x.itemId)?.name}`)},
       delExtra(){const x=ev.extras[+a.dataset.i];ev.extras.splice(+a.dataset.i,1);stamp(ev);logChange(`Evento "${ev.name}": tolto ${x&&item(x.itemId)?.name}`)},
