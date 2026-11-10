@@ -375,16 +375,17 @@ const fmtD=d=>d?new Date(d+'T00:00').toLocaleDateString('it-IT',{weekday:'short'
 /* ===================== CALCOLO ===================== */
 // Distributore (Botex PSA 321): ingresso CEE 32 A trifase (3 × 32 A × 230 V), 6 prese Schuko da 16 A (2 per fase). Carico tenuto all'80%.
 function psa(watt){return Math.max(1,Math.ceil(watt/(3*32*230*0.8)))}
+function offSet(s,cols,rows){const o=new Set();(s.off||[]).forEach(x=>{const [k,r]=x.split(',').map(Number);if(k<cols&&r<rows)o.add(k+','+r)});return o}
 function screenCalc(s){
   const it=item(s.ledId); if(!it) return null;
   let cols,rows;
   if(s.mode==='metri'){cols=Math.ceil((+s.w*1000)/it.modW-1e-9);rows=Math.ceil((+s.h*1000)/it.modH-1e-9)}
   else{cols=Math.max(0,Math.round(+s.w));rows=Math.max(0,Math.round(+s.h))}
-  const mods=cols*rows;
+  const off=offSet(s,cols,rows), mods=cols*rows-off.size;
   const scorta=Math.ceil(mods*(+DB.settings.scorta||0)/100);
   const modsTot=mods+scorta;
   const cases=Math.ceil(modsTot/it.modPerCase);
-  return {it,cols,rows,mods,scorta,modsTot,cases,
+  return {it,off,cols,rows,mods,scorta,modsTot,cases,
     leftover:cases*it.modPerCase-modsTot,
     pxW:cols*it.pxW,pxH:rows*it.pxH,
     mW:cols*it.modW/1000,mH:rows*it.modH/1000,
@@ -487,10 +488,11 @@ function vInv(){
 /* ---------- Lista eventi ---------- */
 function vEvents(){
   const today=new Date().toISOString().slice(0,10);
-  const evs=[...DB.events].sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+  const evs=[...DB.events].filter(e=>e.id!=='chiesa').sort((a,b)=>(a.start||'').localeCompare(b.start||''));
   const fut=evs.filter(e=>(e.end||e.start||'9')>=today), past=evs.filter(e=>(e.end||e.start||'9')<today);
   const row=e=>{const st=status(e);return `<div class="ev" data-open="${e.id}"><div><b>${esc(e.name||'Senza nome')}</b><div class="mut">${fmtD(e.start)}${e.end&&e.end!==e.start?' → '+fmtD(e.end):''} ${e.place?'· '+esc(e.place):''}</div></div><span class="sp"></span><span class="tag ${st.cls}">${st.txt}</span></div>${e._by?`<div class="by" style="padding:0 10px 8px">✏️ ${esc(e._by)} · ${ago(e._at)}</div>`:''}`};
   return `<div class="card"><div class="row"><h2 style="margin:0">Eventi</h2><span class="sp"></span><button class="btn" data-act="addEv">+ Nuovo evento</button></div></div>
+  <div class="card"><div class="ev" data-act="chiesa"><div><b>⛪ Ledwall della chiesa</b><div class="mut">La nostra configurazione fissa: forma, pixelmap e cablaggio</div></div><span class="sp"></span><span class="mut" style="font-size:20px">›</span></div></div>
   <div class="card evlist"><h3 style="margin-top:0">Prossimi</h3>${fut.map(row).join('')||'<p class="mut">Nessun evento. Crea il primo con "+ Nuovo evento".</p>'}
   ${past.length?`<h3>Passati</h3>${past.map(row).join('')}`:''}</div>`;
 }
@@ -550,9 +552,12 @@ function vEvent(id){
       <div><b>${c.pxW} × ${c.pxH}</b><span>risoluzione px (${(c.pxW*c.pxH/1e6).toFixed(2)} MP)</span></div>
       <div><b>${c.kg.toFixed(0)} kg</b><span>peso moduli</span></div>
       <div><b>${(c.watt/1000).toFixed(1)} kW</b><span>consumo max · ~${Math.ceil(c.watt/(Math.sqrt(3)*400))} A/fase${c.watt?` · ${psa(c.watt)} distrib.`:''}</span></div></div>`;
-      h+=`<div class="pmbox">${(()=>{const k=Math.min(900/Math.max(1,c.pxW),340/Math.max(1,c.pxH)),dw=Math.round(c.pxW*k),dh=Math.round(c.pxH*k);return `<canvas class="pm" data-pm="${i}" width="${dw*2}" height="${dh*2}" style="width:${dw}px${s.cabOn==='1'&&s.cabMode==='man'?';touch-action:none;cursor:crosshair':''}"></canvas>`})()}
+      h+=`<div class="pmbox">${(()=>{const k=Math.min(900/Math.max(1,c.pxW),340/Math.max(1,c.pxH)),dw=Math.round(c.pxW*k),dh=Math.round(c.pxH*k);return `<canvas class="pm" data-pm="${i}" width="${dw*2}" height="${dh*2}" style="width:${dw}px${(s.cabOn==='1'&&s.cabMode==='man')||s.cabOn==='3'?';touch-action:none;cursor:crosshair':''}"></canvas>`})()}
       <div class="row noprint" style="margin-top:8px"><b style="flex:1">🎯 Pixelmap ${c.pxW} × ${c.pxH}</b><button class="btn sm" data-pmvid="${i}">🎬 Scarica video loop</button><button class="btn sec sm" data-pmpng="${i}">🖼 PNG</button></div>
-      <div class="grid noprint" style="margin-top:8px"><div><label>Vista</label><select data-sf="cabOn"><option value="">🎯 Pixelmap</option><option value="1" ${s.cabOn==='1'?'selected':''}>🔌 Cablaggio dati</option><option value="2" ${s.cabOn==='2'?'selected':''}>⚡ Corrente</option></select></div>
+      <div class="grid noprint" style="margin-top:8px"><div><label>Vista</label><select data-sf="cabOn"><option value="">🎯 Pixelmap</option><option value="1" ${s.cabOn==='1'?'selected':''}>🔌 Cablaggio dati</option><option value="2" ${s.cabOn==='2'?'selected':''}>⚡ Corrente</option><option value="3" ${s.cabOn==='3'?'selected':''}>✂️ Forma</option></select></div>
+      ${s.cabOn==='3'?`<div style="grid-column:1/-1"><p class="mut" style="margin:0 0 6px">Tocca (o trascina sopra) i moduli per toglierli o rimetterli, oppure scegli da che colonna a che colonna va ogni fila.</p>
+        ${[...Array(c.rows)].map((_,r)=>{let a=-1,b=-1;for(let k=0;k<c.cols;k++)if(!c.off.has(k+','+r)){if(a<0)a=k;b=k}return `<div class="row" style="gap:8px;margin:4px 0;flex-wrap:nowrap"><b style="width:60px">Fila ${r+1}</b><span class="mut">da colonna</span><input type="number" min="1" max="${c.cols}" step="1" data-forma="${i}:${r}:a" value="${a<0?'':a+1}" style="width:80px"><span class="mut">a</span><input type="number" min="1" max="${c.cols}" step="1" data-forma="${i}:${r}:b" value="${b<0?'':b+1}" style="width:80px"><span class="mut">${b<0?0:[...Array(c.cols)].filter((_,k)=>!c.off.has(k+','+r)).length} moduli</span></div>`}).join('')}
+        <button class="btn sec sm" data-formaall="${i}" style="margin-top:6px">Accendi tutto</button></div>`:''}
       ${s.cabOn==='2'?(()=>{const pp=powPlan(c,s),w=+c.it.watt||0;if(!w)return `<div style="grid-column:1/-1" class="bad">Manca il consumo del modulo nell'inventario.</div>`;
         return `<div><label>Partenza</label><select data-sf="cabStart">${[['BL','In basso a sinistra'],['BR','In basso a destra'],['TL','In alto a sinistra'],['TR','In alto a destra']].map(([v,l])=>`<option value="${v}" ${(s.cabStart||'BL')===v?'selected':''}>${l}</option>`).join('')}</select></div>
         <div><label>Direzione</label><select data-sf="cabDir"><option value="col" ${(s.cabDir||'col')==='col'?'selected':''}>Per colonne ↕</option><option value="row" ${s.cabDir==='row'?'selected':''}>Per file ↔</option></select></div>
@@ -694,16 +699,17 @@ function cabPlan(c,s){
   const fromRight=start[1]==='R', fromBottom=start[0]==='B', order=[];
   if(dir==='col'){for(let a=0;a<c.cols;a++){const k=fromRight?c.cols-1-a:a;for(let b=0;b<c.rows;b++){const up=(a%2===0)===fromBottom;order.push([k,up?c.rows-1-b:b])}}}
   else{for(let a=0;a<c.rows;a++){const r=fromBottom?c.rows-1-a:a;for(let b=0;b<c.cols;b++){const lr=(a%2===0)!==fromRight;order.push([lr?b:c.cols-1-b,r])}}}
+  {const f=order.filter(([k,r])=>!c.off.has(k+','+r));order.length=0;order.push(...f)}
   const mpp=12;
   let chains=[];
-  if(s.cabMode==='man')chains=((s.cabMan&&s.cabMan.ports)||[[]]).map(ch=>ch.filter(([k,r])=>k<c.cols&&r<c.rows));
+  if(s.cabMode==='man')chains=((s.cabMan&&s.cabMan.ports)||[[]]).map(ch=>ch.filter(([k,r])=>k<c.cols&&r<c.rows&&!c.off.has(k+','+r)));
   else for(let i=0;i<order.length;i+=mpp)chains.push(order.slice(i,i+mpp));
   if(!chains.length)chains=[[]];
   // corrente: distributori da A ampere con 5 uscite; ogni uscita alimenta al massimo mpu moduli (16 A di base)
   const all=chains.flat(), mpu=Math.max(1,Math.round(+s.cabMpu||(watt?Math.floor(16*230/watt):10)));
   const mpd=Math.max(1,Math.min(5*mpu,watt?Math.floor(A*230/watt):5*mpu));
   const pos={};let g=0;chains.forEach((ch,p)=>ch.forEach(([k,r],i)=>{const d=Math.floor(g/mpd),u=Math.floor((g%mpd)/mpu);g++;pos[k+','+r]={p:p+1,idx:i+1,d:d+1,u:u+1}}));
-  return {order,chains,mpp,mpu,mpd,ports:chains.length,dist:Math.max(1,Math.ceil(all.length/mpd)),pos,A,liberi:c.cols*c.rows-all.length,troppi:chains.map((ch,i)=>ch.length>mpp?i+1:0).filter(Boolean)};
+  return {order,chains,mpp,mpu,mpd,ports:chains.length,dist:Math.max(1,Math.ceil(all.length/mpd)),pos,A,liberi:c.mods-all.length,troppi:chains.map((ch,i)=>ch.length>mpp?i+1:0).filter(Boolean)};
 }
 function pmDraw(g,c,t,scr){
   const W=c.pxW,H=c.pxH,mw=c.it.pxW,mh=c.it.pxH;
@@ -712,7 +718,10 @@ function pmDraw(g,c,t,scr){
   const q=Math.min(mw,mh)/2, nx=Math.max(1,Math.round(mw/q)), ny=Math.max(1,Math.round(mh/q)), qw=mw/nx, qh=mh/ny;
   const hue=[350,180,110,285,30,210,320,55][(scr._i||0)%8], C1=`hsl(${hue},55%,62%)`, C2=`hsl(${hue},58%,40%)`;
   const fw=Math.max(2,Math.round(Math.min(mw,mh)*.03)), cab=scr.cabOn==='1'?cabPlan(c,scr):scr.cabOn==='2'?powPlan(c,scr):null;
-  for(let r=0;r<c.rows;r++)for(let k=0;k<c.cols;k++){const n=r*c.cols+k, x0=k*mw, y0=r*mh, cp=cab&&cab.pos[k+','+r];
+  let nOn=0;
+  for(let r=0;r<c.rows;r++)for(let k=0;k<c.cols;k++){const x0=k*mw, y0=r*mh, cp=cab&&cab.pos[k+','+r];
+    if(c.off.has(k+','+r)){g.fillStyle='#0b0b0c';g.fillRect(x0,y0,mw,mh);if(scr.cabOn==='3'){g.strokeStyle='rgba(255,255,255,.25)';g.lineWidth=fw;g.setLineDash([fw*3,fw*3]);g.strokeRect(x0+fw,y0+fw,mw-fw*2,mh-fw*2);g.setLineDash([])}continue}
+    const n=nOn++;
     for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){g.fillStyle=((k*nx+i)+(r*ny+j))%2?C2:C1;g.fillRect(x0+i*qw,y0+j*qh,qw+.5,qh+.5)}
     g.strokeStyle=`hsl(${hue},45%,18%)`;g.lineWidth=fw;g.strokeRect(x0+fw/2,y0+fw/2,mw-fw,mh-fw);
     // numero del modulo, al centro
@@ -737,7 +746,7 @@ function pmDraw(g,c,t,scr){
   // etichetta centrale come nelle pixelmap professionali
   let big=Math.max(16,Math.round(Math.min(W*.14,H*.1)));{g.font='800 '+big+'px -apple-system,system-ui,sans-serif';const m=g.measureText(scr.name||'Schermo').width+big;if(m>W*.9)big=Math.max(14,Math.floor(big*W*.9/m))}const sm=Math.max(10,Math.round(big*.42));
   g.textAlign='center';g.textBaseline='middle';g.font=`800 ${big}px -apple-system,system-ui,sans-serif`;
-  const l1=scr.name||'Schermo', l2=`W: ${W}  H: ${H}`, l3=`${c.cols} × ${c.rows} moduli · ${mw}×${mh} px`;
+  const l1=scr.name||'Schermo', l2=`W: ${W}  H: ${H}`, l3=`${c.cols} × ${c.rows}${c.off.size?` (${c.mods} moduli)`:' moduli'} · ${mw}×${mh} px`;
   const w1=g.measureText(l1).width;g.font=`700 ${sm}px -apple-system,system-ui,sans-serif`;const bw=Math.max(w1,g.measureText(l3).width)+big;const bh=big*1.2+sm*2.9;
   g.fillStyle='rgba(0,0,0,.6)';g.beginPath();g.roundRect?g.roundRect(cx-bw/2,cy-bh/2,bw,bh,big*.3):g.rect(cx-bw/2,cy-bh/2,bw,bh);g.fill();
   g.fillStyle='#fff';g.font=`800 ${big}px -apple-system,system-ui,sans-serif`;g.fillText(l1,cx,cy-bh/2+big*.75);
@@ -759,7 +768,7 @@ function powPlan(c,s){
 function pmCab(g,c,t,scr,cab){
   const W=c.pxW,H=c.pxH,mw=c.it.pxW,mh=c.it.pxH,lw=Math.max(3,Math.round(Math.min(mw,mh)/22));
   const cen=([k,r])=>[k*mw+mw/2,r*mh+mh/2];
-  if(scr.cabMode==='man')for(let r=0;r<c.rows;r++)for(let k=0;k<c.cols;k++)if(!cab.pos[k+','+r]){g.fillStyle='rgba(0,0,0,.55)';g.fillRect(k*mw,r*mh,mw,mh)}
+  if(scr.cabMode==='man')for(let r=0;r<c.rows;r++)for(let k=0;k<c.cols;k++)if(!cab.pos[k+','+r]&&!c.off.has(k+','+r)){g.fillStyle='rgba(0,0,0,.55)';g.fillRect(k*mw,r*mh,mw,mh)}
   for(let p=0;p<cab.ports;p++){const pts=cab.chains[p].map(cen), col=cab.col?cab.col(p):CAB_COL[p%CAB_COL.length];if(!pts.length)continue;
     g.lineCap='round';g.lineJoin='round';
     g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=lw*1.9;g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.stroke();
@@ -809,7 +818,7 @@ function cabSave(o,msg){stamp(o.ev);if(msg)logChange(`Evento "${o.ev.name}", ${o
 function cabCell(cv,e){const o=pmScreen(cv.dataset.pm);if(!o)return null;const r=cv.getBoundingClientRect();
   const x=(e.clientX-r.left)/r.width*o.c.pxW,y=(e.clientY-r.top)/r.height*o.c.pxH;const k=Math.floor(x/o.c.it.pxW),rr=Math.floor(y/o.c.it.pxH);
   return k>=0&&rr>=0&&k<o.c.cols&&rr<o.c.rows?[k,rr]:null}
-function cabTocca(i,cell,primo){const o=cabScr(i);if(!o)return;const M=cabMan(o.s),ap=Math.min(CABPORT[i]||0,M.ports.length-1),ch=M.ports[ap];
+function cabTocca(i,cell,primo){const o=cabScr(i);if(!o)return;if((o.s.off||[]).includes(cell.join(',')))return;const M=cabMan(o.s),ap=Math.min(CABPORT[i]||0,M.ports.length-1),ch=M.ports[ap];
   const key=cell.join(','),dove=M.ports.findIndex(c=>c.some(m=>m.join(',')===key));
   if(dove>=0){if(primo){M.ports[dove]=M.ports[dove].filter(m=>m.join(',')!==key);CABDRAG.tolto=true}return}
   if(CABDRAG&&CABDRAG.tolto)return; if(ch.length>=12){if(!CABDRAG||!CABDRAG.pieno){toast('Porta piena (max 12 moduli): premi + Porta per continuare');if(CABDRAG)CABDRAG.pieno=true}return} ch.push(cell);}
@@ -840,6 +849,21 @@ document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest
   // converte le misure così lo schermo resta uguale
   if(c){if(m==='metri'){sc.w=+(c.mW).toFixed(2);sc.h=+(c.mH).toFixed(2)}else{sc.w=c.cols;sc.h=c.rows}}
   sc.mode=m;stamp(ev);logChange(`Evento "${ev.name}", ${sc.name}: unità → ${m}`);save();render()});
+
+// forma dello schermo: moduli spenti
+let FORMADRAG=null;
+function formaSet(o,key,spento){const S=new Set(o.s.off||[]);spento?S.add(key):S.delete(key);o.s.off=[...S]}
+document.addEventListener('pointerdown',e=>{const cv=e.target.closest&&e.target.closest('canvas[data-pm]');if(!cv)return;const o=cabScr(cv.dataset.pm);
+  if(!o||o.s.cabOn!=='3')return;e.preventDefault();cv.setPointerCapture&&cv.setPointerCapture(e.pointerId);const cell=cabCell(cv,e);if(!cell)return;
+  const key=cell.join(','),sp=!(o.s.off||[]).includes(key);FORMADRAG={i:cv.dataset.pm,cv,sp,last:key};formaSet(o,key,sp)});
+document.addEventListener('pointermove',e=>{if(!FORMADRAG)return;const cell=cabCell(FORMADRAG.cv,e);if(!cell||cell.join(',')===FORMADRAG.last)return;FORMADRAG.last=cell.join(',');const o=cabScr(FORMADRAG.i);o&&formaSet(o,FORMADRAG.last,FORMADRAG.sp)});
+document.addEventListener('pointerup',()=>{if(!FORMADRAG)return;const o=cabScr(FORMADRAG.i);FORMADRAG=null;if(o){cabSave(o,'modificata la forma');render()}});
+document.addEventListener('change',e=>{const t=e.target;if(!t.dataset||!t.dataset.forma)return;const [i,r,w]=t.dataset.forma.split(':');const o=cabScr(i);if(!o)return;const c=screenCalc(o.s);if(!c)return;
+  let a=-1,b=-1;for(let k=0;k<c.cols;k++)if(!c.off.has(k+','+r)){if(a<0)a=k;b=k}
+  const v=Math.max(1,Math.min(c.cols,Math.round(+t.value||1)))-1;if(w==='a')a=v;else b=v;if(a<0)a=0;if(b<0)b=c.cols-1;if(b<a)[a,b]=[b,a];
+  const S=new Set((o.s.off||[]).filter(x=>x.split(',')[1]!==r));for(let k=0;k<c.cols;k++)if(k<a||k>b)S.add(k+','+r);o.s.off=[...S];
+  cabSave(o,`forma fila ${+r+1}: colonne ${a+1}–${b+1}`);render()});
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-formaall]');if(!b)return;const o=cabScr(b.dataset.formaall);if(!o)return;o.s.off=[];cabSave(o,'accesi tutti i moduli');render()});
 /* ---------- Home ---------- */
 function vHome(){
   const adm=isAdmin(), oggi=oggiS(), me=first(myName());
@@ -980,6 +1004,9 @@ function bind(){
         if(cat==='led')Object.assign(it,{name:'Nuovo modulo LED',modPerCase:6,modW:500,modH:1000,pxW:192,pxH:384,kg:7.5,watt:180});
         stamp(it);DB.items.unshift(it);logChange(`Aggiunto articolo in ${CATS[cat]}`)},
       async delItem(){const it=item(a.dataset.id);if(await ask('Eliminare questo articolo?')){DB.items=DB.items.filter(i=>i.id!==a.dataset.id);logChange(`Eliminato articolo "${it&&it.name}"`)}else return 'nosave'},
+      chiesa(){let c=DB.events.find(x=>x.id==='chiesa');if(!c){const leds=DB.items.filter(i=>i.cat==='led'),l=leds.find(i=>+i.pxW===192&&+i.pxH===384)||leds[0];const off=[];for(let k=0;k<52;k++)if(k<16||k>29)off.push(k+',2');
+        c={id:'chiesa',name:'⛪ Ledwall chiesa',place:'Chiesa',start:'',end:'',screens:[{name:'LEDWALL',ledId:l?.id,mode:'moduli',w:52,h:3,off,cabOn:'3'}],extras:[],checked:{}};stamp(c);DB.events.push(c);logChange('Creata la configurazione della chiesa')}
+        curEv='chiesa';window.SCROPEN=0;window.SCREV='chiesa';rememberUI()},
       addEv(){const t=new Date().toISOString().slice(0,10);const n={id:uid(),name:'Nuovo evento',place:'',start:t,end:'',screens:[],extras:[],checked:{}};stamp(n);DB.events.push(n);curEv=n.id;window.EVDATI=n.id;logChange('Creato un nuovo evento')},
       back(){curEv=null;view='eventi';rememberUI();render();return 'nosave'},
       async delEv(){if(await ask('Eliminare l\'evento?')){logChange(`Eliminato evento "${ev.name}"`);DB.events=DB.events.filter(x=>x.id!==curEv);curEv=null}else return 'nosave'},
