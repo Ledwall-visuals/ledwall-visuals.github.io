@@ -68,7 +68,7 @@ function barreSettimana(lunedi, larg, alt, cw, gap, celle) {
   const xm0 = m0 <= t0 ? -1e4 : m0 >= t1 ? 1e4 : xOf(m0), xm1 = m1 >= t1 ? 1e4 : m1 <= t0 ? -1e4 : xOf(m1);
   const y = Math.round(alt / 2 - 5), hb = 18;
   // PIENO = 0.8: con la tinta di iOS le parti opache diventano bianche e la scritta sparirebbe
-  const PIENO = 0.8, DIM = 0.15, F = 70; // F = larghezza della sfumatura (circa un giorno e mezzo)
+  const PIENO = 0.8, DIM = 0.15, F = cw; // la sfumatura finisce entro il primo giorno fuori dal mese
   const liscio = t => t * t * (3 - 2 * t);
   // trasparenza in base alla posizione: piena nel mese, sfuma dolcemente oltre il confine
   const alfa = x => { const d = Math.max(xm0 - x, x - xm1, 0); if (d <= 0) return PIENO; if (d >= F) return DIM; return PIENO - (PIENO - DIM) * liscio(d / F); };
@@ -78,10 +78,20 @@ function barreSettimana(lunedi, larg, alt, cw, gap, celle) {
     const x0 = xOf(a < t0 ? t0 : a), x1 = xOf(b > t1 ? t1 : b); if (x1 - x0 < 3) return;
     barre.push([x0, x1]);
     const col = l.col ? l.col.hex : "ff9f0a", r = 4;
-    // estremi arrotondati + fette da 1 pt in mezzo, ognuna con la sua trasparenza
-    [[x0, x0 + r * 2], [x1 - r * 2, x1]].forEach(([u, v]) => { const p = new Path(); p.addRoundedRect(new Rect(u, y, v - u, hb), r, r); c.addPath(p); c.setFillColor(new Color(col, alfa((u + v) / 2))); c.fillPath(); });
-    for (let x = x0 + r; x < x1 - r; x += 1) { c.setFillColor(new Color(col, alfa(x + 0.5))); c.fillRect(new Rect(x, y, Math.min(1.02, x1 - r - x), hb)); }
-    const ia = Math.max(x0, xm0), ib = Math.min(x1, xm1), dentro = ib - ia > 24;
+    // tratti con la stessa trasparenza uniti in una sola forma; arrotondati solo gli estremi esterni (niente righine o giunture)
+    const pezzo = (u, v, a, sx2, dx2) => {
+      const p = new Path(), L = sx2 ? r : 0, R = dx2 ? r : 0;
+      p.move(new Point(u + L, y)); p.addLine(new Point(v - R, y));
+      if (R) p.addQuadCurve(new Point(v, y + r), new Point(v, y)); p.addLine(new Point(v, y + hb - R));
+      if (R) p.addQuadCurve(new Point(v - r, y + hb), new Point(v, y + hb)); p.addLine(new Point(u + L, y + hb));
+      if (L) p.addQuadCurve(new Point(u, y + hb - r), new Point(u, y + hb)); p.addLine(new Point(u, y + L));
+      if (L) p.addQuadCurve(new Point(u + r, y), new Point(u, y)); p.closeSubpath();
+      c.addPath(p); c.setFillColor(new Color(col, a)); c.fillPath();
+    };
+    let sx = x0, sa = alfa(x0 + 0.5);
+    for (let x = Math.floor(x0) + 1; x < x1; x += 1) { const a2 = alfa(x + 0.5); if (Math.abs(a2 - sa) > 0.004) { pezzo(sx, x, sa, sx === x0, false); sx = x; sa = a2; } }
+    pezzo(sx, x1, sa, sx === x0, true);
+    const ia = Math.max(x0, xm0), ib = Math.min(x1, xm1), dentro = ib - ia > 30;
     const ta = dentro ? ia : x0, tb = dentro ? ib : x1;
     if (tb - ta > 24) { c.setFont(Font.heavySystemFont(8)); c.setTextColor(new Color("#ffffff", dentro ? 1 : 0.4)); c.setTextAlignedCenter(); c.drawTextInRect((l.cal || "Lavoro").toUpperCase(), new Rect(ta, y + 4, tb - ta, hb)); }
   });
