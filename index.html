@@ -365,6 +365,8 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const fmtD=d=>d?new Date(d+'T00:00').toLocaleDateString('it-IT',{weekday:'short',day:'2-digit',month:'short',year:'numeric'}):'';
 
 /* ===================== CALCOLO ===================== */
+// Botex PSA 321: ingresso CEE 32 A trifase (3 × 32 A × 230 V), 6 prese Schuko da 16 A (2 per fase). Carico tenuto all'80%.
+function psa(watt){return Math.max(1,Math.ceil(watt/(3*32*230*0.8)))}
 function screenCalc(s){
   const it=item(s.ledId); if(!it) return null;
   let cols,rows;
@@ -522,7 +524,7 @@ function vEvent(id){
       <div><b>${c.mW.toFixed(2)} × ${c.mH.toFixed(2)} m</b><span>misura reale</span></div>
       <div><b>${c.pxW} × ${c.pxH}</b><span>risoluzione px (${(c.pxW*c.pxH/1e6).toFixed(2)} MP)</span></div>
       <div><b>${c.kg.toFixed(0)} kg</b><span>peso moduli</span></div>
-      <div><b>${(c.watt/1000).toFixed(1)} kW</b><span>consumo max · ~${Math.ceil(c.watt/(Math.sqrt(3)*400))} A per fase in trifase (${Math.ceil(c.watt/230)} A se monofase)</span></div></div>`;
+      <div><b>${(c.watt/1000).toFixed(1)} kW</b><span>consumo max · ~${Math.ceil(c.watt/(Math.sqrt(3)*400))} A per fase in trifase${c.watt?` · ${psa(c.watt)} Botex PSA 321`:''}</span></div></div>`;
       h+=`<div class="pmbox">${(()=>{const k=Math.min(900/Math.max(1,c.pxW),340/Math.max(1,c.pxH)),dw=Math.round(c.pxW*k),dh=Math.round(c.pxH*k);return `<canvas class="pm" data-pm="${i}" width="${dw*2}" height="${dh*2}" style="width:${dw}px${s.cabOn==='1'&&s.cabMode==='man'?';touch-action:none;cursor:crosshair':''}"></canvas>`})()}
       <div class="row noprint" style="margin-top:8px"><b style="flex:1">🎯 Pixelmap ${c.pxW} × ${c.pxH}</b><button class="btn sm" data-pmvid="${i}">🎬 Scarica video loop</button><button class="btn sec sm" data-pmpng="${i}">🖼 PNG</button></div>
       <div class="grid noprint" style="margin-top:8px"><div><label>Vista</label><select data-sf="cabOn"><option value="">🎯 Pixelmap</option><option value="1" ${s.cabOn==='1'?'selected':''}>🔌 Cablaggio</option></select></div>
@@ -537,7 +539,7 @@ function vEvent(id){
     } else h+=`<p class="bad">Aggiungi prima un tipo di cassa LED nell'inventario.</p>`;
     h+='</div>';
   });
-  {const W=(ev.screens||[]).map(screenCalc).filter(Boolean).reduce((a,c)=>a+c.watt,0);if(W&&(ev.screens||[]).length>1)h+=`<div class="kpi"><div><b>${(W/1000).toFixed(1)} kW</b><span>consumo max di tutti gli schermi · ~${Math.ceil(W/(Math.sqrt(3)*400))} A per fase in trifase</span></div></div>`}
+  {const W=(ev.screens||[]).map(screenCalc).filter(Boolean).reduce((a,c)=>a+c.watt,0);if(W&&(ev.screens||[]).length>1)h+=`<div class="kpi"><div><b>${(W/1000).toFixed(1)} kW</b><span>consumo max di tutti gli schermi · ~${Math.ceil(W/(Math.sqrt(3)*400))} A per fase in trifase · ${psa(W)} Botex PSA 321</span></div></div>`}
   h+=`</div>`;
 
   // materiale
