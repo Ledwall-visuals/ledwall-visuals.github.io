@@ -533,12 +533,12 @@ function vEvent(id){
     <div style="grid-column:1/-1"><label>Note (referente, orari, accesso, corrente disponibile...)</label><textarea data-ef="notes">${esc(ev.notes)}</textarea></div>
   </div></div>`;
   if(dati)return h+`<div class="evl">${topL}</div><div class="evc">${DATI}</div><div class="evr">${topR}</div></div>`;
-  let C=`<div class="card"><div class="row" style="flex-wrap:nowrap"><div style="flex:1;min-width:0"><h2 style="margin:0">${esc(ev.name||'Evento')}</h2><div class="mut">${[ev.place,ev.start?fmtD(ev.start)+(ev.end&&ev.end!==ev.start?' → '+fmtD(ev.end):''):''].filter(Boolean).map(esc).join(' · ')}</div></div><button class="btn sec sm noprint" data-evdati="1">✏️ Dati evento</button></div></div>
-  <div class="card"><h2>Schermi dell'evento</h2>`;
-  if(!(ev.screens||[]).length)C+=`<p class="mut">Nessuno schermo: crealo nella colonna a sinistra.</p>`;
-  (ev.screens||[]).forEach((x,k)=>{const cx=screenCalc(x);C+=`<div class="screen scrrow" data-scropen="${k}" style="${k===i?'border:1px solid var(--acc)':''}"><div class="row" style="flex-wrap:nowrap"><div style="flex:1;min-width:0"><b>${esc(x.name||'Schermo')}</b><div class="mut">${cx?`${cx.cols}×${cx.rows} moduli · ${cx.mW.toFixed(1)}×${cx.mH.toFixed(1)} m · ${cx.pxW}×${cx.pxH} px · ${(cx.watt/1000).toFixed(1)} kW`:'—'}</div></div><span class="mut" style="font-size:20px">${k===i?'●':'›'}</span></div></div>`});
-  {const W=(ev.screens||[]).map(screenCalc).filter(Boolean).reduce((a,c)=>a+c.watt,0);if(W&&(ev.screens||[]).length>1)C+=`<div class="kpi"><div><b>${(W/1000).toFixed(1)} kW</b><span>consumo max di tutti gli schermi · ~${Math.ceil(W/(Math.sqrt(3)*400))} A per fase in trifase · ${psa(W)} distributor${psa(W)>1?'i':'e'}</span></div></div>`}
-  C+=`</div>`;
+  let C=`<div class="card"><div class="row" style="flex-wrap:nowrap"><div style="flex:1;min-width:0"><h2 style="margin:0">${esc(ev.name||'Evento')}</h2><div class="mut">${[ev.place,ev.start?fmtD(ev.start)+(ev.end&&ev.end!==ev.start?' → '+fmtD(ev.end):''):''].filter(Boolean).map(esc).join(' · ')}</div></div><button class="btn sec sm noprint" data-evdati="1">✏️ Dati evento</button></div></div>`;
+  L+=`<div class="card"><h2>Schermi dell'evento</h2>`;
+  if(!(ev.screens||[]).length)L+=`<p class="mut">Nessuno schermo: crealo qui sopra.</p>`;
+  (ev.screens||[]).forEach((x,k)=>{const cx=screenCalc(x);L+=`<div class="screen scrrow" data-scropen="${k}" style="${k===i?'border:1px solid var(--acc)':''}"><div class="row" style="flex-wrap:nowrap"><div style="flex:1;min-width:0"><b>${esc(x.name||'Schermo')}</b><div class="mut">${cx?`${cx.cols}×${cx.rows} moduli · ${cx.mW.toFixed(1)}×${cx.mH.toFixed(1)} m · ${cx.pxW}×${cx.pxH} px · ${(cx.watt/1000).toFixed(1)} kW`:'—'}</div></div><span class="mut" style="font-size:20px">${k===i?'●':'›'}</span></div></div>`});
+  {const W=(ev.screens||[]).map(screenCalc).filter(Boolean).reduce((a,c)=>a+c.watt,0);if(W&&(ev.screens||[]).length>1)L+=`<div class="kpi"><div><b>${(W/1000).toFixed(1)} kW</b><span>consumo max di tutti gli schermi · ~${Math.ceil(W/(Math.sqrt(3)*400))} A per fase in trifase · ${psa(W)} distributor${psa(W)>1?'i':'e'}</span></div></div>`}
+  L+=`</div>`;
   if(s){C+=`<div class="card" data-scr="${i}"><h2>${esc(s.name||'Schermo')}</h2>`;
     let h='';
     if(c){ h+=`<div class="kpi">
