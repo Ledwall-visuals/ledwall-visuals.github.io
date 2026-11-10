@@ -34,10 +34,14 @@ try {
     lavoro = (await CalendarEvent.between(da, a, cals)).map(e => ({ s: e.startDate, e: e.endDate, all: e.isAllDay, t: e.title, cal: e.calendar.title, col: e.calendar.color }));
   }
 } catch (e) { lavoro = []; }
-const lavOn = s => lavoro.filter(l => ds(l.s) === s);
-const orario = l => l.all ? "" : hm(l.s).replace(":00", "") + "–" + hm(l.e).replace(":00", "");
-// nella cella: nome del turno (calendario), es. "Mattina"; se il calendario è generico, l'orario
-const lavTxt = l => /^(mattin[ao]|pomeriggio|notte)$/i.test((l.cal || "").trim()) ? l.cal.trim() : (orario(l) || l.t || "Lavoro");
+// un turno può durare più giorni (es. Mattina da lunedì a venerdì): lo segno su ogni giorno lun-ven del periodo
+const fineGiorno = l => ds(l.all ? new Date(l.e.getTime() - 1) : l.e);
+const lavOn = s => { const g = new Date(s + "T12:00").getDay(); if (g === 0 || g === 6) return []; return lavoro.filter(l => ds(l.s) <= s && s <= fineGiorno(l)); };
+// orari: dall'evento se ha un orario, altrimenti quelli standard del turno
+const ORE = { mattina: "6–14", mattino: "6–14", pomeriggio: "14–22", notte: "22–6" };
+const corto = x => x.replace(":00", "");
+const orario = l => (!l.all && ds(l.s) === ds(l.e)) ? corto(hm(l.s)) + "–" + corto(hm(l.e)) : (!l.all ? corto(hm(l.s)) + "–" + corto(hm(l.e)) : (ORE[(l.cal || "").trim().toLowerCase()] || ""));
+const lavTxt = l => orario(l) || (l.cal || l.t || "Lavoro");
 // prossima domenica (oggi compreso)
 const nx = (d.turni || []).find(t => t.data >= today);
 const nxNome = nx ? (nx.mattina === nx.sera ? first(nx.mattina) : [nx.mattina, nx.sera].filter(Boolean).map(first).join(" / ")) : "";
@@ -88,8 +92,8 @@ if (mode.toLowerCase().startsWith("task")) {
     if (nx.mattina === nx.sera) { const im = r.addImage(circle(nx.mattina, 44)); im.imageSize = new Size(44, 44); r.addSpacer(8); txt(r, first(nx.mattina), Font.boldSystemFont(15)); }
     else { [nx.mattina, nx.sera].forEach((n, i) => { const s = r.addStack(); s.layoutVertically(); const im = s.addImage(circle(n, 34)); im.imageSize = new Size(34, 34); txt(s, (i ? "🌙 " : "☀️ ") + first(n), Font.systemFont(10)); r.addSpacer(8); }); }
   }
-  const pl = lavoro.filter(l => l.e > new Date()).sort((a, b) => a.s - b.s)[0];
-  if (pl) { w.addSpacer(8); const g = ds(pl.s) === today ? "Oggi" : pl.s.toLocaleDateString("it-IT", { weekday: "short", day: "numeric" }); txt(w, "💼 " + g + " · " + lavTxt(pl), Font.semiboldSystemFont(11), new Color(pl.col ? pl.col.hex : "#ff9f0a")); if (orario(pl) && lavTxt(pl) !== orario(pl)) txt(w, orario(pl), Font.systemFont(10), MUT); }
+  let pg = null, pl = null; for (let i = 0; i < 21 && !pl; i++) { const x = new Date(); x.setDate(x.getDate() + i); const l = lavOn(ds(x))[0]; if (l) { pg = x; pl = l; } }
+  if (pl) { w.addSpacer(8); const g = ds(pg) === today ? "Oggi" : pg.toLocaleDateString("it-IT", { weekday: "short", day: "numeric" }); txt(w, "💼 " + g + " · " + (pl.cal || "Lavoro"), Font.semiboldSystemFont(11), new Color(pl.col ? pl.col.hex : "#ff9f0a")); if (orario(pl)) txt(w, orario(pl), Font.systemFont(10), MUT); }
 } else {
   // calendario a griglia: large = mese intero (+ giorni fino alla domenica dopo), medium = settimana corrente e successiva
   const now = new Date(); const y = now.getFullYear(), mo = now.getMonth();
