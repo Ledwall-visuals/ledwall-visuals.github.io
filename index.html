@@ -1004,7 +1004,10 @@ function bind(){
         if(cat==='led')Object.assign(it,{name:'Nuovo modulo LED',modPerCase:6,modW:500,modH:1000,pxW:192,pxH:384,kg:7.5,watt:180});
         stamp(it);DB.items.unshift(it);logChange(`Aggiunto articolo in ${CATS[cat]}`)},
       async delItem(){const it=item(a.dataset.id);if(await ask('Eliminare questo articolo?')){DB.items=DB.items.filter(i=>i.id!==a.dataset.id);logChange(`Eliminato articolo "${it&&it.name}"`)}else return 'nosave'},
-      chiesa(){let c=DB.events.find(x=>x.id==='chiesa');if(!c){const leds=DB.items.filter(i=>i.cat==='led'),l=leds.find(i=>+i.pxW===192&&+i.pxH===384)||leds[0];const off=[];for(let k=0;k<52;k++)if(k<16||k>29)off.push(k+',2');
+      chiesa(){let c=DB.events.find(x=>x.id==='chiesa');let l=DB.items.find(i=>i.cat==='led'&&+i.pxW===192&&+i.pxH===384);
+        if(!l){l={id:uid(),cat:'led',name:'Moduli P2.6 (chiesa)',qty:118,modPerCase:6,modW:500,modH:1000,pxW:192,pxH:384,kg:13,watt:200,autoPer:'none',autoQty:0,note:'Ledwall fisso della chiesa. Peso e consumo stimati: da controllare.'};stamp(l);DB.items.push(l);logChange('Aggiunto in inventario: Moduli P2.6 (chiesa)')}
+        if(c&&c.screens[0]){const s0=c.screens[0],cur=item(s0.ledId);if(!cur||+cur.pxW!==192||+cur.pxH!==384){s0.ledId=l.id;stamp(c)}}
+        if(!c){const off=[];for(let k=0;k<52;k++)if(k<16||k>29)off.push(k+',2');
         c={id:'chiesa',name:'⛪ Ledwall chiesa',place:'Chiesa',start:'',end:'',screens:[{name:'LEDWALL',ledId:l?.id,mode:'moduli',w:52,h:3,off,cabOn:'3'}],extras:[],checked:{}};stamp(c);DB.events.push(c);logChange('Creata la configurazione della chiesa')}
         curEv='chiesa';window.SCROPEN=0;window.SCREV='chiesa';rememberUI()},
       addEv(){const t=new Date().toISOString().slice(0,10);const n={id:uid(),name:'Nuovo evento',place:'',start:t,end:'',screens:[],extras:[],checked:{}};stamp(n);DB.events.push(n);curEv=n.id;window.EVDATI=n.id;logChange('Creato un nuovo evento')},
