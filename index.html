@@ -426,7 +426,7 @@ document.getElementById('nav').onclick=e=>{const b=e.target.closest('[data-v]');
 function rememberUI(){try{sessionStorage.setItem(KEY+'-ui',JSON.stringify({view,curEv}))}catch(e){}}
 function render(){
   const adm=isAdmin(); if(!adm){curEv=null;if(!VISTE_UTENTE.includes(view))view='calendario'}
-  const TABS=adm?['calendario','eventi','turni','task','backup']:['calendario','task','inventario','assenze','backup'];
+  const TABS=adm?['calendario','eventi','turni','task','inventario','backup']:['calendario','task','inventario','assenze','backup'];
   const attivo=TABS.includes(view)?view:'backup';
   document.querySelectorAll('#nav button').forEach(b=>{b.classList.toggle('on',b.dataset.v===attivo);b.style.display=TABS.includes(b.dataset.v)?'':'none'});
   const pb=document.getElementById('pwbtn');if(pb&&USER)pb.textContent=initials(myName());
@@ -957,7 +957,7 @@ async function copia(t,msg){try{await navigator.clipboard.writeText(t);toast(msg
 function gi(ic,col,txt,attr){return `<button class="gi" ${attr}><span class="ic" style="background:${col}">${ic}</span><span class="gt">${txt}<span class="sp"></span><span class="chev">›</span></span></button>`}
 function vBackup(){
   return `<div class="hello"><h2>Altro</h2></div>
-  <div class="glist">${gi('📦','#ff9f0a','Inventario','data-gov="inventario"')}${gi('🚫','#ff453a','Assenze','data-gov="assenze"')}${gi('🕘','#5e5ce6','Registro modifiche','data-gov="registro"')}</div>
+  <div class="glist">${gi('🚫','#ff453a','Assenze','data-gov="assenze"')}${gi('🕘','#5e5ce6','Registro modifiche','data-gov="registro"')}</div>
   <div class="ghead">Permessi</div>
   <div class="glist">${gi('👁','#30d158','Vedi il sito come gli altri','data-ante="1"')}</div>
   <p class="mut" style="margin:-14px 16px 22px;font-size:13px">Lucas, Matteo ed Edo vedono il calendario dei turni, l'inventario in sola lettura, le assenze e il widget. Tu e Sebi vedete e modificate tutto.</p>`+vWidget()+`<div class="card"><h2>Backup dati</h2>
