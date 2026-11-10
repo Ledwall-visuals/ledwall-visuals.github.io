@@ -412,6 +412,7 @@ function needs(ev){
 /* ===================== VISTE ===================== */
 let view='calendario', curEv=null;
 try{const u=JSON.parse(sessionStorage.getItem(KEY+'-ui'));if(u){view=u.view||view;curEv=u.curEv||null}}catch(e){}
+if(location.hash.length>1){view=decodeURIComponent(location.hash.slice(1));curEv=null;history.replaceState(null,'',location.pathname)}
 document.getElementById('nav').onclick=e=>{const b=e.target.closest('[data-v]');const v=b&&b.dataset.v;if(v){view=v;curEv=null;rememberUI();render()}};
 function rememberUI(){try{sessionStorage.setItem(KEY+'-ui',JSON.stringify({view,curEv}))}catch(e){}}
 function render(){
@@ -722,12 +723,17 @@ document.addEventListener('change',async e=>{const t=e.target;if(!USER||!t.datas
 const FEED_BASE='https://rliekssnvssbpkjzpash.supabase.co/functions/v1/feed';
 const SITO_URL='https://ledwall-visuals.github.io/';
 let FEEDTOK=null;
-async function loadTok(){if(!USER||FEEDTOK)return;const {data}=await sb.from('feed_token').select('token').eq('id',1).maybeSingle();if(data){FEEDTOK=data.token;if(view==='backup')render()}}
+let MIOTOK=null;
+async function loadTok(){if(!USER||(FEEDTOK&&MIOTOK))return;const {data}=await sb.from('feed_token').select('token').eq('id',1).maybeSingle();if(data)FEEDTOK=data.token;
+  let {data:m}=await sb.from('token_personale').select('token').maybeSingle();
+  if(!m){const r=await sb.from('token_personale').insert({}).select('token').single();m=r.data}
+  if(m)MIOTOK=m.token; if(FEEDTOK&&view==='backup')render()}
 function scriptable(){return `// Gestionale Ledwall – widget per Scriptable (si aggiorna da solo)
-// Parametro del widget: calendario | task | checklist | checklist:Nome
+// Parametro del widget: calendario | task | todo | todo:Nome lista
 const FEED_TOKEN = "${FEEDTOK}";
 const SOLO_TURNI = ${!isAdmin()};
 const IO = "${esc(first(myName()))}";
+const MIO = "${MIOTOK||''}";
 const CODE_URL = "https://api.github.com/repos/Ledwall-visuals/ledwall-visuals.github.io/contents/widget.js";
 const fm = FileManager.local(), f = fm.joinPath(fm.documentsDirectory(), "ledwall-widget.js");
 let code;
@@ -738,15 +744,15 @@ Script.complete();
 `}
 function vWidget(){
   loadTok();
-  if(!FEEDTOK)return `<div class="card"><h2>📱 Widget iPhone</h2><p class="mut">Caricamento…</p></div>`;
+  if(!FEEDTOK||!MIOTOK)return `<div class="card"><h2>📱 Widget iPhone</h2><p class="mut">Caricamento…</p></div>`;
   const jolly=isMe(turni().jolly);
   const adm=isAdmin(), ics=FEED_BASE.replace('https://','webcal://')+'?t='+FEEDTOK+(adm?'':'&solo=turni'), icsMe=jolly?ics:ics+'&p='+encodeURIComponent(first(myName()));
   return `<div class="card"><h2>📱 Widget iPhone</h2>
   <h3>1. Calendario (widget Calendario di Apple)</h3>
   <p class="mut">Tocca il pulsante e conferma "Iscriviti": nel Calendario dell'iPhone compaiono ${adm?'gli eventi, ':''}${jolly?'<b>tutti i turni</b> (sei il jolly)':`<b>solo i tuoi turni</b> (come ${esc(first(myName()))})`}${adm?' e i tuoi task con scadenza':''}, e si aggiornano da soli. Poi aggiungi alla Home il widget <b>Calendario</b> di Apple. Il nome deve corrispondere a quello nei turni: lo cambi da 👤 Profilo.</p>
   <div class="row"><a class="btn" href="${icsMe}" style="text-decoration:none">📅 Iscriviti al calendario</a><button class="btn sec" data-act="copyIcs">Copia il mio link</button></div>
-  <h3>2. Widget personalizzato${adm?' (calendario, task o checklist)':' (calendario dei turni)'}</h3>
-  <p class="mut">Installa l'app gratuita <b>Scriptable</b> dall'App Store. Tocca "Copia script", apri Scriptable, tocca <b>+</b>, incolla e chiamalo "Ledwall". Poi sulla Home: tieni premuto → <b>+</b> → Scriptable → scegli la misura → tocca il widget → Script: <b>Ledwall</b> → Parameter: <b>calendario</b>${adm?', <b>task</b> oppure <b>checklist</b> (o <b>checklist:Nome lista</b>). Puoi mettere più widget con parametri diversi':''}.</p>
+  <h3>2. Widget personalizzato (calendario, task o to-do list)</h3>
+  <p class="mut">Installa l'app gratuita <b>Scriptable</b> dall'App Store. Tocca "Copia script", apri Scriptable, tocca <b>+</b>, incolla e chiamalo "Ledwall". Poi sulla Home: tieni premuto → <b>+</b> → Scriptable → scegli la misura → tocca il widget → Script: <b>Ledwall</b> → Parameter: <b>calendario</b>, <b>task</b> oppure <b>todo</b> (o <b>todo:Nome lista</b> per una lista precisa). Puoi mettere più widget con parametri diversi, tutti con lo stesso script. Nei widget vedi le cose comuni e anche le tue 🔒 personali.</p>
   <div class="row"><button class="btn" data-act="copyScript">📋 Copia script</button></div>
   <p class="mut">⚠️ Questi link contengono una chiave privata: non condividerli fuori dal team.</p></div>`;
 }

@@ -43,9 +43,13 @@ Deno.serve(async (req) => {
   const { data: row } = await sb.from("condiviso").select("data").eq("id", "main").maybeSingle();
   const DB = (row?.data || {}) as any;
   // task e to-do list: solo quelle comuni (il link del feed è condiviso nel team)
-  const { data: att } = await sb.from("attivita").select("*").eq("comune", true).order("created_at");
+  // u = token personale: aggiunge anche le task e liste "Solo io" di quella persona
+  const u = url.searchParams.get("u") || "";
+  let uid = "";
+  if (/^[0-9a-f]{32}$/.test(u)) { const { data: tp } = await sb.from("token_personale").select("user_id").eq("token", u).maybeSingle(); uid = tp?.user_id || ""; }
+  const { data: att } = await sb.from("attivita").select("*").or(uid ? `comune.eq.true,user_id.eq.${uid}` : "comune.eq.true").order("created_at");
   DB.tasks = (att || []).filter((x: any) => x.tipo === "task");
-  DB.checklists = (att || []).filter((x: any) => x.tipo === "lista").map((x: any) => ({ nome: x.testo, voci: x.voci || [] }));
+  DB.checklists = (att || []).filter((x: any) => x.tipo === "lista").map((x: any) => ({ nome: x.testo, voci: x.voci || [], mio: !x.comune }));
   const T: Turni | null = DB.turni || null;
   const { data: bl } = await sb.from("blocchi").select("nome,dal,al").gte("al", new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10));
   BLOCCHI = (bl || []) as Blocco[];
@@ -55,7 +59,7 @@ Deno.serve(async (req) => {
   const p = (url.searchParams.get("p") || "").trim().toLowerCase();
   const first = (n: string) => String(n || "").trim().split(/\s+/)[0].toLowerCase();
   const mine = (n: string) => !p || (!!n && first(n) === first(p));
-  // solo=turni: utenti non admin, niente eventi/task/checklist
+  // solo=turni: utenti non admin, niente eventi (le task/liste comuni nel json le vedono tutti)
   const solo = url.searchParams.get("solo") === "turni";
 
   if (f === "json") {
@@ -67,8 +71,8 @@ Deno.serve(async (req) => {
     const PAL = ["#e5484d", "#4f8cff", "#2fbf71", "#f0a020", "#a855f7", "#14b8a6", "#ec4899", "#84cc16"];
     const ini = (n: string) => { const p = String(n || "?").trim().split(/\s+/); return (p[1] ? p[0][0] + p[1][0] : (p[0] || "?").slice(0, 2)).toUpperCase(); };
     const persone = T ? [...(T.persone || []), T.jolly].filter(Boolean).map((n, i) => ({ nome: n, iniziali: ini(n), colore: PAL[i % PAL.length] })) : [];
-    const task = solo ? [] : (DB.tasks || []).filter((x: any) => !x.fatto).map((x: any) => ({ testo: x.testo, chi: x.chi || "", scadenza: x.scadenza || "" }));
-    const checklist = solo ? [] : (DB.checklists || []).map((c: any) => ({ nome: c.nome, voci: (c.voci || []).map((v: any) => ({ testo: v.testo, fatto: !!v.fatto })) }));
+    const task = (DB.tasks || []).filter((x: any) => !x.fatto).sort((a: any, b: any) => (a.scadenza || "9").localeCompare(b.scadenza || "9")).map((x: any) => ({ testo: x.testo, chi: x.chi || "", scadenza: x.scadenza || "", mio: !x.comune }));
+    const checklist = (DB.checklists || []).map((c: any) => ({ nome: c.nome, mio: !!c.mio, voci: (c.voci || []).map((v: any) => ({ testo: v.testo, fatto: !!v.fatto })) }));
     return new Response(JSON.stringify({ oggi: today, persone, eventi, turni, task, checklist }), { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
   }
 

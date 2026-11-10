@@ -1,6 +1,6 @@
 // Gestionale Ledwall – widget Scriptable (caricato dal loader con FEED_TOKEN definito)
 // Parametro del widget: calendario (default) | task | checklist | checklist:Nome
-const FEED = "https://rliekssnvssbpkjzpash.supabase.co/functions/v1/feed?f=json&t=" + FEED_TOKEN + (typeof SOLO_TURNI !== "undefined" && SOLO_TURNI ? "&solo=turni" : "");
+const FEED = "https://rliekssnvssbpkjzpash.supabase.co/functions/v1/feed?f=json&t=" + FEED_TOKEN + (typeof SOLO_TURNI !== "undefined" && SOLO_TURNI ? "&solo=turni" : "") + (typeof MIO !== "undefined" && MIO ? "&u=" + MIO : "");
 const SITO = "https://ledwall-visuals.github.io/";
 const fm = FileManager.local();
 const cache = fm.joinPath(fm.documentsDirectory(), "ledwall-cache.json");
@@ -172,27 +172,64 @@ function txt(stack, s, font, color) { const t = stack.addText(s); t.font = font;
 const w = new ListWidget();
 w.backgroundColor = BG; w.url = SITO; w.setPadding(10, 10, 10, 10);
 
+// barra di avanzamento (fatti / totale)
+function barra(fatti, tot, larg, col) {
+  const c = new DrawContext(); c.size = new Size(larg, 5); c.opaque = false; c.respectScreenScale = true;
+  const p = new Path(); p.addRoundedRect(new Rect(0, 0, larg, 5), 2.5, 2.5); c.addPath(p); c.setFillColor(new Color("#ffffff", 0.12)); c.fillPath();
+  const k = tot ? Math.max(5, larg * fatti / tot) : 0;
+  if (k) { const q = new Path(); q.addRoundedRect(new Rect(0, 0, k, 5), 2.5, 2.5); c.addPath(q); c.setFillColor(col); c.fillPath(); }
+  return c.getImage();
+}
+const WLARG = fam === "small" ? 130 : 300;
+const VERDE = new Color("#30d158"), ROSSO = new Color("#ff453a");
+const pallino = (r, pieno, col) => { const t = r.addText(pieno ? "●" : "○"); t.font = Font.systemFont(13); t.textColor = col || MUT; return t; };
+
 if (mode.toLowerCase().startsWith("task")) {
-  txt(w, "✅ Task", Font.boldSystemFont(14), ACC); w.addSpacer(6);
-  const max = fam === "small" ? 4 : fam === "medium" ? 5 : 12;
-  if (!d.task.length) txt(w, "Niente da fare 🎉", Font.systemFont(12), MUT);
-  d.task.slice(0, max).forEach(t => {
-    const r = w.addStack(); r.centerAlignContent();
-    if (t.chi) { const im = r.addImage(circle(t.chi, 16)); im.imageSize = new Size(16, 16); r.addSpacer(6); }
-    txt(r, t.testo, Font.systemFont(12)); r.addSpacer();
-    if (t.scadenza && fam !== "small") txt(r, new Date(t.scadenza + "T12:00").toLocaleDateString("it-IT", { day: "numeric", month: "short" }), Font.systemFont(11), t.scadenza < today ? new Color("#e5484d") : MUT);
-    w.addSpacer(4);
+  w.url = SITO + "#task";
+  const h = w.addStack(); h.centerAlignContent();
+  txt(h, "Task", Font.heavySystemFont(fam === "small" ? 15 : 17), TX); h.addSpacer();
+  txt(h, String(d.task.length), Font.heavySystemFont(fam === "small" ? 15 : 17), ACC);
+  w.addSpacer(8);
+  const max = fam === "small" ? 4 : fam === "medium" ? 4 : 11;
+  if (!d.task.length) { w.addSpacer(); txt(w, "Niente da fare 🎉", Font.systemFont(13), MUT); }
+  d.task.slice(0, max).forEach((t, i) => {
+    const r = w.addStack(); r.centerAlignContent(); r.spacing = 6;
+    const scad = t.scadenza && t.scadenza < today;
+    pallino(r, false, scad ? ROSSO : ACC);
+    const tt = txt(r, (t.mio ? "🔒 " : "") + t.testo, Font.mediumSystemFont(13)); tt.lineLimit = 1;
+    r.addSpacer();
+    if (fam !== "small") {
+      if (t.scadenza) txt(r, new Date(t.scadenza + "T12:00").toLocaleDateString("it-IT", { day: "numeric", month: "short" }), Font.systemFont(11), scad ? ROSSO : MUT);
+      if (t.chi) { const im = r.addImage(circle(t.chi, 16)); im.imageSize = new Size(16, 16); }
+    }
+    if (i < Math.min(max, d.task.length) - 1) w.addSpacer(fam === "large" ? 7 : 5);
   });
-} else if (mode.toLowerCase().startsWith("check")) {
+  if (d.task.length > max) { w.addSpacer(4); txt(w, "+ altri " + (d.task.length - max), Font.systemFont(11), MUT); }
+  w.addSpacer();
+} else if (mode.toLowerCase().startsWith("check") || mode.toLowerCase().startsWith("to")) {
+  w.url = SITO + "#task";
   const nome = mode.split(":")[1];
   const c = (nome ? d.checklist.find(x => x.nome.toLowerCase() === nome.trim().toLowerCase()) : null) || d.checklist[0];
-  if (!c) txt(w, "📋 Nessuna checklist", Font.boldSystemFont(14), ACC);
+  if (!c) { txt(w, "To-do list", Font.heavySystemFont(17), TX); w.addSpacer(); txt(w, "Nessuna lista", Font.systemFont(13), MUT); w.addSpacer(); }
   else {
-    const h = w.addStack(); txt(h, "📋 " + c.nome, Font.boldSystemFont(14), ACC); h.addSpacer();
-    txt(h, c.voci.filter(v => v.fatto).length + "/" + c.voci.length, Font.boldSystemFont(12), MUT); w.addSpacer(6);
-    const max = fam === "small" ? 5 : fam === "medium" ? 5 : 13;
-    c.voci.filter(v => !v.fatto).concat(c.voci.filter(v => v.fatto)).slice(0, max)
-      .forEach(v => { txt(w, (v.fatto ? "✓  " : "○  ") + v.testo, Font.systemFont(12), v.fatto ? MUT : TX); w.addSpacer(3); });
+    const n = c.voci.filter(v => v.fatto).length, tot = c.voci.length;
+    const h = w.addStack(); h.centerAlignContent();
+    const tt = txt(h, (c.mio ? "🔒 " : "") + c.nome, Font.heavySystemFont(fam === "small" ? 14 : 17), TX); tt.lineLimit = 1; h.addSpacer(6);
+    txt(h, n + "/" + tot, Font.semiboldSystemFont(13), n === tot && tot ? VERDE : MUT);
+    w.addSpacer(6);
+    const bi = w.addImage(barra(n, tot, WLARG, n === tot && tot ? VERDE : ACC)); bi.imageSize = new Size(WLARG, 5);
+    w.addSpacer(8);
+    const max = fam === "small" ? 4 : fam === "medium" ? 4 : 11;
+    const L = c.voci.filter(v => !v.fatto).concat(c.voci.filter(v => v.fatto)).slice(0, max);
+    if (!tot) txt(w, "Lista vuota", Font.systemFont(13), MUT);
+    else if (n === tot) { w.addSpacer(); txt(w, "Tutto fatto ✓", Font.semiboldSystemFont(14), VERDE); }
+    else L.forEach((v, i) => {
+      const r = w.addStack(); r.centerAlignContent(); r.spacing = 6;
+      pallino(r, v.fatto, v.fatto ? VERDE : ACC);
+      const t = txt(r, v.testo, Font.mediumSystemFont(13), v.fatto ? MUT : TX); t.lineLimit = 1;
+      if (i < L.length - 1) w.addSpacer(fam === "large" ? 7 : 5);
+    });
+    w.addSpacer();
   }
 } else if (fam === "small") {
   // prossima domenica

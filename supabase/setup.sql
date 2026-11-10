@@ -18,3 +18,4 @@ create policy "solo_proprietario" on public.stato
 
 -- Task e to-do list (10 nov 2026): tabella public.attivita (tipo task|lista, comune true/false, voci jsonb).
 -- RLS: vedi comuni o tue; crea le tue; modifica comuni o tue; elimina tue (o admin sulle comuni). Trigger attivita_guard.
+-- token_personale (10 nov 2026): un token per utente; il feed con &u=<token> aggiunge le task/liste "Solo io" di quella persona.
