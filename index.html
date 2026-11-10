@@ -738,7 +738,9 @@ function pmDraw(g,c,t,scr){
     g.fillStyle='rgba(255,255,255,.8)';g.font=`600 ${Math.round(fs*.6)}px -apple-system,system-ui,sans-serif`;g.fillText(pos,mx,my+fs*.55);}
   if(cab){pmCab(g,c,t,scr,cab);g.restore();return}
   // radar dal centro (leggero)
-  const cx=W/2,cy=H/2,R=Math.hypot(W,H)/2,a=t/PM_LOOP*Math.PI*2-Math.PI/2, lw=Math.max(2,Math.round(Math.min(mw,mh)/64));
+  // centro: in mezzo alla parte dove ci sono tutte le file accese (es. la parte alta 3 file della chiesa)
+  let cx=W/2;if(c.off.size){const full=[];for(let k=0;k<c.cols;k++){let ok=true;for(let r=0;r<c.rows;r++)if(c.off.has(k+','+r))ok=false;if(ok)full.push(k)}let best=null,st=null;full.forEach((k,j)=>{if(j===0||k!==full[j-1]+1)st=k;if(!best||k-st>best[1]-best[0])best=[st,k]});if(best)cx=(best[0]+best[1]+1)/2*mw}
+  const cy=H/2,R=Math.hypot(W,H),a=t/PM_LOOP*Math.PI*2-Math.PI/2, lw=Math.max(2,Math.round(Math.min(mw,mh)/64));
   if(g.createConicGradient){const cg=g.createConicGradient(a-1,cx,cy);const k1=1/(Math.PI*2);cg.addColorStop(0,'rgba(255,255,255,0)');cg.addColorStop(k1,'rgba(255,255,255,.35)');cg.addColorStop(k1+.001,'rgba(255,255,255,0)');cg.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=cg;g.fillRect(0,0,W,H)}
   g.strokeStyle='rgba(255,255,255,.9)';g.lineWidth=lw*1.5;g.beginPath();g.moveTo(cx,cy);g.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);g.stroke();
   // diagonali, cerchio e croce centrale
