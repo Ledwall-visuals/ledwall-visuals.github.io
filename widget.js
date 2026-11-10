@@ -1,7 +1,7 @@
 // Gestionale Ledwall – widget Scriptable (caricato dal loader con FEED_TOKEN definito)
 // Parametro del widget: calendario (default) | task | checklist | checklist:Nome
 const FEED = "https://rliekssnvssbpkjzpash.supabase.co/functions/v1/feed?f=json&t=" + FEED_TOKEN + (typeof SOLO_TURNI !== "undefined" && SOLO_TURNI ? "&solo=turni" : "");
-const SITO = "https://fascinating-sable-5fbcf3.netlify.app";
+const SITO = "https://beniamincuric-design.github.io/Gestionale-ledwall/";
 const fm = FileManager.local();
 const cache = fm.joinPath(fm.documentsDirectory(), "ledwall-cache.json");
 let d;

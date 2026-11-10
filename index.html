@@ -689,7 +689,7 @@ function vTask(){
 
 /* ---------- Widget iPhone ---------- */
 const FEED_BASE='https://rliekssnvssbpkjzpash.supabase.co/functions/v1/feed';
-const SITO_URL='https://fascinating-sable-5fbcf3.netlify.app';
+const SITO_URL='https://beniamincuric-design.github.io/Gestionale-ledwall/';
 let FEEDTOK=null;
 async function loadTok(){if(!USER||FEEDTOK)return;const {data}=await sb.from('feed_token').select('token').eq('id',1).maybeSingle();if(data){FEEDTOK=data.token;if(view==='backup')render()}}
 function scriptable(){return `// Gestionale Ledwall – widget per Scriptable (si aggiorna da solo)
