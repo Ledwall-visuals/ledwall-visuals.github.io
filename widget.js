@@ -60,6 +60,9 @@ function barreSettimana(lunedi, larg, alt, cw, gap) {
   const ora = new Date(), m0 = new Date(ora.getFullYear(), ora.getMonth(), 1), m1 = new Date(ora.getFullYear(), ora.getMonth() + 1, 1);
   const xm0 = m0 <= t0 ? 0 : m0 >= t1 ? larg : xOf(m0), xm1 = m1 >= t1 ? larg : m1 <= t0 ? 0 : xOf(m1);
   let n = 0;
+  // giorno di oggi: solo una cornice, disegnata sotto le barre
+  const oggi0 = new Date(); oggi0.setHours(0, 0, 0, 0); const gi = Math.round((oggi0 - t0) / 864e5);
+  if (gi >= 0 && gi < 7) { n++; const p = new Path(); p.addRoundedRect(new Rect(gi * (cw + gap) + 1, 1, cw - 2, alt - 2), 6, 6); c.addPath(p); c.setStrokeColor(new Color("#4f8cff")); c.setLineWidth(2); c.strokePath(); }
   lavoro.forEach(l => {
     const [a, b] = intervallo(l); if (b <= t0 || a >= t1) return;
     const x0 = xOf(a < t0 ? t0 : a), x1 = xOf(b > t1 ? t1 : b); if (x1 - x0 < 3) return; n++;
@@ -68,10 +71,10 @@ function barreSettimana(lunedi, larg, alt, cw, gap) {
     const bar = (xa, xb, al) => { const p = new Path(); p.addRoundedRect(new Rect(xa, y, xb - xa, hb), 4, 4); c.addPath(p); c.setFillColor(new Color(col, al)); c.fillPath(); };
     const ia = Math.max(x0, xm0), ib = Math.min(x1, xm1), dentro = ib - ia > 1;
     // parte fuori dal mese: trasparente; parte nel mese: piena (gli angoli restano dritti sul confine del mese)
-    if (!dentro || ia > x0 || ib < x1) bar(x0, x1, 0.3);
+    if (!dentro || ia > x0 || ib < x1) bar(x0, x1, 0.22);
     if (dentro) { bar(ia, ib, 0.9); c.setFillColor(new Color(col, 0.9)); if (ia > x0) c.fillRect(new Rect(ia, y, 4, hb)); if (ib < x1) c.fillRect(new Rect(ib - 4, y, 4, hb)); }
     const ta = dentro ? ia : x0, tb = dentro ? ib : x1;
-    if (tb - ta > 24) { c.setFont(Font.heavySystemFont(8)); c.setTextColor(new Color("#ffffff", dentro ? 1 : 0.55)); c.setTextAlignedCenter(); c.drawTextInRect((l.cal || "Lavoro").toUpperCase(), new Rect(ta, y + 4, tb - ta, hb)); }
+    if (tb - ta > 24) { c.setFont(Font.heavySystemFont(8)); c.setTextColor(new Color("#ffffff", dentro ? 1 : 0.45)); c.setTextAlignedCenter(); c.drawTextInRect((l.cal || "Lavoro").toUpperCase(), new Rect(ta, y + 4, tb - ta, hb)); }
   });
   return n ? c.getImage() : null;
 }
@@ -160,7 +163,7 @@ if (mode.toLowerCase().startsWith("task")) {
       const it = days[r * 7 + i]; const cell = row.addStack(); cell.size = new Size(cw, ch); cell.layoutVertically(); cell.cornerRadius = 6;
       if (!it || it.blank) continue;
       const s = ds(it.dt), dim = !!it.extra;
-      cell.backgroundColor = s === today ? new Color("#4f8cff", 0.35) : new Color("#ffffff", dim ? 0.03 : 0.08);
+      cell.backgroundColor = new Color("#ffffff", dim ? 0.03 : 0.08); // oggi: cornice disegnata dietro le barre
       cell.setPadding(2, 3, 2, 2);
       const top = cell.addStack(); top.centerAlignContent();
       txt(top, String(it.dt.getDate()), Font.semiboldSystemFont(10), dim ? new Color("#7d8491", 0.6) : (s === today ? TX : MUT));
