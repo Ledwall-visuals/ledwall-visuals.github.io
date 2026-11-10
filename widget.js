@@ -74,7 +74,18 @@ function barreSettimana(lunedi, larg, alt, cw, gap, celle) {
     const ia = Math.max(x0, xm0), ib = Math.min(x1, xm1), dentro = ib - ia > 1;
     // parte fuori dal mese: trasparente; parte nel mese: piena (gli angoli restano dritti sul confine del mese)
     if (!dentro || ia > x0 || ib < x1) bar(x0, x1, 0.22);
-    if (dentro) { bar(ia, ib, 1); c.setFillColor(new Color(col, 1)); if (ia > x0) c.fillRect(new Rect(ia, y, 4, hb)); if (ib < x1) c.fillRect(new Rect(ib - 4, y, 4, hb)); }
+    // PIENO = 0.8: con la tinta di iOS le parti opache diventano bianche e la scritta sparirebbe
+    const PIENO = 0.8, DIM = 0.22, F = 26, fetta = 2;
+    if (dentro) {
+      bar(ia, ib, PIENO); c.setFillColor(new Color(col, PIENO));
+      if (ia > x0) c.fillRect(new Rect(ia, y, 4, hb)); if (ib < x1) c.fillRect(new Rect(ib - 4, y, 4, hb));
+      // sfumatura sul confine del mese: da pieno a trasparente
+      for (let k = 0; k < F; k += fetta) {
+        const al = PIENO - (PIENO - DIM) * (k + fetta) / F;
+        if (ib < x1 && ib + k < x1) { c.setFillColor(new Color(col, al - DIM)); c.fillRect(new Rect(ib + k, y, Math.min(fetta, x1 - ib - k), hb)); }
+        if (ia > x0 && ia - k - fetta > x0) { c.setFillColor(new Color(col, al - DIM)); c.fillRect(new Rect(ia - k - fetta, y, fetta, hb)); }
+      }
+    }
     const ta = dentro ? ia : x0, tb = dentro ? ib : x1;
     if (tb - ta > 24) { c.setFont(Font.heavySystemFont(8)); c.setTextColor(new Color("#ffffff", dentro ? 1 : 0.45)); c.setTextAlignedCenter(); c.drawTextInRect((l.cal || "Lavoro").toUpperCase(), new Rect(ta, y + 4, tb - ta, hb)); }
   });
