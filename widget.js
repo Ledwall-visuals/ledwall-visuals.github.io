@@ -93,7 +93,7 @@ function barreSettimana(lunedi, larg, alt, cw, gap, celle) {
     pezzo(sx, x1, sa, sx === x0, true);
     const ia = Math.max(x0, xm0), ib = Math.min(x1, xm1), dentro = ib - ia > 30;
     const ta = dentro ? ia : x0, tb = dentro ? ib : x1;
-    if (tb - ta > 24) { c.setFont(Font.heavySystemFont(8)); c.setTextColor(new Color("#ffffff", dentro ? 1 : 0.4)); c.setTextAlignedCenter(); c.drawTextInRect((l.cal || "Lavoro").toUpperCase(), new Rect(ta, y + 4, tb - ta, hb)); }
+    if (tb - ta > 24) { c.setFont(Font.heavySystemFont(8)); c.setTextColor(dentro ? new Color("#000000", 0.85) : new Color("#ffffff", 0.4)); c.setTextAlignedCenter(); c.drawTextInRect((l.cal || "Lavoro").toUpperCase(), new Rect(ta, y + 4, tb - ta, hb)); }
   });
   // giorno di oggi: solo una cornice, interrotta dove passa una barra
   const oggi0 = new Date(); oggi0.setHours(0, 0, 0, 0); const gi = Math.round((oggi0 - t0) / 864e5);
