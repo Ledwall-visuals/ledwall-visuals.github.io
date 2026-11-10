@@ -9,7 +9,7 @@ try { d = await new Request(FEED).loadJSON(); fm.writeString(cache, JSON.stringi
 catch (e) { d = fm.fileExists(cache) ? JSON.parse(fm.readString(cache)) : { persone: [], turni: [], eventi: [], task: [], checklist: [], oggi: new Date().toISOString().slice(0, 10) }; }
 
 const fam = config.widgetFamily || "large";
-const mode = String(args.widgetParameter || "calendario").trim();
+const mode = String(args.widgetParameter || "calendario").split(";")[0].trim() || "calendario";
 const BG = new Color("#0f1115"), CELL = new Color("#1b1f27"), TX = new Color("#e8eaef"), MUT = new Color("#7d8491"), ACC = new Color("#4f8cff"), OK = new Color("#2fbf71");
 const pers = {}; (d.persone || []).forEach(p => pers[p.nome] = p);
 const first = n => String(n || "").trim().split(/\s+/)[0];
@@ -19,11 +19,31 @@ const today = ds(new Date());
 const turni = {}; (d.turni || []).forEach(t => turni[t.data] = t);
 const evOn = s => (d.eventi || []).filter(e => e.dal <= s && s <= e.al);
 const taskOn = s => (d.task || []).filter(t => t.scadenza === s);
+// Turni di lavoro dal Calendario dell'iPhone: calendario il cui nome contiene "lavoro" (o "work"),
+// oppure quello indicato nel parametro, es. "calendario;lavoro=Turni ufficio"
+const parti = String(args.widgetParameter || "").split(";").map(x => x.trim());
+const calNome = ((parti.find(x => /^lavoro=/i.test(x)) || "").split("=")[1] || "").trim().toLowerCase();
+const hm = dt => pad(dt.getHours()) + ":" + pad(dt.getMinutes());
+let lavoro = [];
+try {
+  const cals = (await Calendar.forEvents()).filter(c => calNome ? c.title.toLowerCase() === calNome : /lavoro|work/i.test(c.title));
+  if (cals.length) {
+    const da = new Date(); da.setDate(1); da.setDate(da.getDate() - 7); da.setHours(0, 0, 0, 0);
+    const a = new Date(da); a.setDate(a.getDate() + 60);
+    lavoro = (await CalendarEvent.between(da, a, cals)).map(e => ({ s: e.startDate, e: e.endDate, all: e.isAllDay, t: e.title, col: e.calendar.color }));
+  }
+} catch (e) { lavoro = []; }
+const lavOn = s => lavoro.filter(l => ds(l.s) === s);
+const lavTxt = l => l.all ? (l.t || "Lavoro") : hm(l.s).replace(":00", "") + "–" + hm(l.e).replace(":00", "");
+// prossima domenica (oggi compreso)
+const nx = (d.turni || []).find(t => t.data >= today);
+const nxNome = nx ? (nx.mattina === nx.sera ? first(nx.mattina) : [nx.mattina, nx.sera].filter(Boolean).map(first).join(" / ")) : "";
 
 function circle(nome, size, alpha) {
   const p = pers[nome] || { iniziali: first(nome).slice(0, 2).toUpperCase(), colore: "#666666" };
   const c = new DrawContext(); c.size = new Size(size, size); c.opaque = false; c.respectScreenScale = true;
-  c.setFillColor(new Color(p.colore, alpha == null ? 0.75 : alpha)); // semi-trasparente: resta leggibile con la tinta iOS c.fillEllipse(new Rect(0, 0, size, size)); c.setStrokeColor(new Color("#ffffff", alpha == null ? 0.5 : 0.25)); c.setLineWidth(size * 0.07); c.strokeEllipse(new Rect(size * 0.04, size * 0.04, size * 0.92, size * 0.92));
+  // semi-trasparente: resta leggibile con la tinta iOS
+  c.setFillColor(new Color(p.colore, alpha == null ? 0.75 : alpha)); c.fillEllipse(new Rect(0, 0, size, size)); c.setStrokeColor(new Color("#ffffff", alpha == null ? 0.5 : 0.25)); c.setLineWidth(size * 0.07); c.strokeEllipse(new Rect(size * 0.04, size * 0.04, size * 0.92, size * 0.92));
   c.setFont(Font.boldSystemFont(size * 0.42)); c.setTextColor(new Color("#ffffff", alpha == null ? 1 : 0.75)); c.setTextAlignedCenter();
   c.drawTextInRect(p.iniziali || "?", new Rect(0, size * 0.25, size, size * 0.6));
   return c.getImage();
@@ -57,7 +77,6 @@ if (mode.toLowerCase().startsWith("task")) {
   }
 } else if (fam === "small") {
   // prossima domenica
-  const nx = (d.turni || []).find(t => t.data >= today);
   txt(w, "⛪ Prossima domenica", Font.boldSystemFont(11), ACC); w.addSpacer(4);
   if (nx) {
     txt(w, new Date(nx.data + "T12:00").toLocaleDateString("it-IT", { day: "numeric", month: "long" }), Font.systemFont(12), MUT);
@@ -66,6 +85,8 @@ if (mode.toLowerCase().startsWith("task")) {
     if (nx.mattina === nx.sera) { const im = r.addImage(circle(nx.mattina, 44)); im.imageSize = new Size(44, 44); r.addSpacer(8); txt(r, first(nx.mattina), Font.boldSystemFont(15)); }
     else { [nx.mattina, nx.sera].forEach((n, i) => { const s = r.addStack(); s.layoutVertically(); const im = s.addImage(circle(n, 34)); im.imageSize = new Size(34, 34); txt(s, (i ? "🌙 " : "☀️ ") + first(n), Font.systemFont(10)); r.addSpacer(8); }); }
   }
+  const pl = lavoro.filter(l => l.e > new Date()).sort((a, b) => a.s - b.s)[0];
+  if (pl) { w.addSpacer(8); const g = ds(pl.s) === today ? "Oggi" : pl.s.toLocaleDateString("it-IT", { weekday: "short", day: "numeric" }); txt(w, "💼 " + g + " " + lavTxt(pl), Font.semiboldSystemFont(11), new Color("#ff9f0a")); }
 } else {
   // calendario a griglia: large = mese intero (+ giorni fino alla domenica dopo), medium = settimana corrente e successiva
   const now = new Date(); const y = now.getFullYear(), mo = now.getMonth();
@@ -84,7 +105,8 @@ if (mode.toLowerCase().startsWith("task")) {
   const head = w.addStack(); head.centerAlignContent();
   const mn = now.toLocaleDateString("it-IT", { month: "long", year: "numeric" });
   txt(head, mn.charAt(0).toUpperCase() + mn.slice(1), Font.boldSystemFont(14)); head.addSpacer();
-  txt(head, "⛪ Ledwall", Font.systemFont(11), MUT);
+  if (nx) { txt(head, "⛪ " + new Date(nx.data + "T12:00").toLocaleDateString("it-IT", { day: "numeric", month: "short" }) + " · ", Font.systemFont(11), MUT); txt(head, nxNome, Font.boldSystemFont(11), nx.mattina && pers[nx.mattina] ? new Color(pers[nx.mattina].colore) : ACC); }
+  else txt(head, "⛪ Ledwall", Font.systemFont(11), MUT);
   w.addSpacer(6);
   const rows = Math.ceil(days.length / 7);
   const cw = 41, ch = fam === "large" ? Math.min(46, Math.floor(280 / rows)) : 46, av = fam === "large" ? 20 : 22;
@@ -111,7 +133,10 @@ if (mode.toLowerCase().startsWith("task")) {
         if (t.mattina === t.sera) { const im = a.addImage(circle(t.mattina, av, dim ? 0.35 : null)); im.imageSize = new Size(av, av); }
         else { [t.mattina, t.sera].filter(Boolean).forEach(n => { const im = a.addImage(circle(n, av - 6, dim ? 0.35 : null)); im.imageSize = new Size(av - 6, av - 6); }); }
         a.addSpacer();
-      } else {
+      }
+      const lv = lavOn(s)[0];
+      if (lv) { cell.addSpacer(1); const lt = txt(cell, lavTxt(lv), Font.semiboldSystemFont(7), new Color(lv.col ? lv.col.hex : "#ff9f0a", dim ? 0.5 : 1)); lt.minimumScaleFactor = 0.6; }
+      if (!(t && (t.mattina || t.sera))) {
         const e = evOn(s)[0];
         if (e && fam === "large") { cell.addSpacer(1); txt(cell, e.nome, Font.systemFont(7), ACC); }
       }
