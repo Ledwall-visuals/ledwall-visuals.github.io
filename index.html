@@ -651,17 +651,13 @@ const PM_LOOP=4; // secondi di un giro del radar = durata del loop
 function pmDraw(g,c,t,scr){
   const W=c.pxW,H=c.pxH,mw=c.it.pxW,mh=c.it.pxH;
   g.save();g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,g.canvas.width,g.canvas.height);g.scale(g.canvas.width/W,g.canvas.height/H);
-  // ogni modulo: un colore suo, diviso nelle sue parti quadrate (192x384 → 2×4 quadrati) con tonalità diverse
+  // un solo colore per schermo (tinta diversa per ogni schermo dell'evento), due tonalità a scacchiera sulle parti di ogni modulo
   const q=Math.min(mw,mh)/2, nx=Math.max(1,Math.round(mw/q)), ny=Math.max(1,Math.round(mh/q)), qw=mw/nx, qh=mh/ny;
-  const L=[34,42,50,58];const hash=(a,b,c2)=>{let h=(a*73856093)^(b*19349663)^(c2*83492791);h=(h^(h>>>13))*1274126177;return ((h^(h>>>16))>>>0)%4};
-  const fw=Math.max(2,Math.round(Math.min(mw,mh)*.035));
-  for(let r=0;r<c.rows;r++)for(let k=0;k<c.cols;k++){const n=r*c.cols+k, hue=(n*137.508)%360, x0=k*mw, y0=r*mh;
-    for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){g.fillStyle=`hsl(${hue},62%,${L[hash(n,i,j)]}%)`;g.fillRect(x0+i*qw,y0+j*qh,qw+.5,qh+.5)}
-    // linee sottili tra le parti del modulo
-    g.strokeStyle=`hsla(${hue},40%,85%,.35)`;g.lineWidth=Math.max(1,fw/3);g.beginPath();
-    for(let i=1;i<nx;i++){g.moveTo(x0+i*qw,y0);g.lineTo(x0+i*qw,y0+mh)}for(let j=1;j<ny;j++){g.moveTo(x0,y0+j*qh);g.lineTo(x0+mw,y0+j*qh)}g.stroke();
-    // cornice scura del modulo
-    g.strokeStyle=`hsl(${hue},55%,16%)`;g.lineWidth=fw;g.strokeRect(x0+fw/2,y0+fw/2,mw-fw,mh-fw);
+  const hue=[350,180,110,285,30,210,320,55][(scr._i||0)%8], C1=`hsl(${hue},55%,62%)`, C2=`hsl(${hue},58%,40%)`;
+  const fw=Math.max(2,Math.round(Math.min(mw,mh)*.03));
+  for(let r=0;r<c.rows;r++)for(let k=0;k<c.cols;k++){const n=r*c.cols+k, x0=k*mw, y0=r*mh;
+    for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){g.fillStyle=((k*nx+i)+(r*ny+j))%2?C2:C1;g.fillRect(x0+i*qw,y0+j*qh,qw+.5,qh+.5)}
+    g.strokeStyle=`hsl(${hue},45%,18%)`;g.lineWidth=fw;g.strokeRect(x0+fw/2,y0+fw/2,mw-fw,mh-fw);
     // numero del modulo, al centro
     const fs=Math.max(9,Math.round(qw*.36)), lab=`${n+1}`, pos=`C${k+1} · F${r+1}`, mx=x0+mw/2, my=y0+mh/2;
     g.textAlign='center';g.textBaseline='middle';
@@ -674,13 +670,14 @@ function pmDraw(g,c,t,scr){
   const cx=W/2,cy=H/2,R=Math.hypot(W,H)/2,a=t/PM_LOOP*Math.PI*2-Math.PI/2, lw=Math.max(2,Math.round(Math.min(mw,mh)/64));
   if(g.createConicGradient){const cg=g.createConicGradient(a-1,cx,cy);const k1=1/(Math.PI*2);cg.addColorStop(0,'rgba(255,255,255,0)');cg.addColorStop(k1,'rgba(255,255,255,.35)');cg.addColorStop(k1+.001,'rgba(255,255,255,0)');cg.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=cg;g.fillRect(0,0,W,H)}
   g.strokeStyle='rgba(255,255,255,.9)';g.lineWidth=lw*1.5;g.beginPath();g.moveTo(cx,cy);g.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);g.stroke();
-  // croce centrale
-  g.strokeStyle='rgba(255,255,255,.6)';g.lineWidth=lw;g.beginPath();g.moveTo(cx,0);g.lineTo(cx,H);g.moveTo(0,cy);g.lineTo(W,cy);g.stroke();
-  // triangoli negli angoli dello schermo e cornice esterna
-  const tri=Math.min(mw,mh)*.5;[[0,0,1,1],[W,0,-1,1],[0,H,1,-1],[W,H,-1,-1]].forEach(([x,y,dx,dy],i)=>{g.fillStyle=['#5ad8e6','#d65ad8','#e6c35a','#ff5a7a'][i];g.beginPath();g.moveTo(x,y);g.lineTo(x+dx*tri,y);g.lineTo(x,y+dy*tri);g.closePath();g.fill()});
+  // diagonali, cerchio e croce centrale
+  g.strokeStyle='rgba(255,255,255,.55)';g.lineWidth=lw;g.beginPath();g.moveTo(0,0);g.lineTo(W,H);g.moveTo(W,0);g.lineTo(0,H);g.stroke();
+  g.beginPath();g.arc(cx,cy,Math.min(W,H)*.32,0,Math.PI*2);g.stroke();
+  g.setLineDash([lw*4,lw*3]);g.beginPath();g.moveTo(cx,0);g.lineTo(cx,H);g.moveTo(0,cy);g.lineTo(W,cy);g.stroke();g.setLineDash([]);
+  // cornice esterna
   const ow=Math.max(3,lw*2);g.strokeStyle='#fff';g.lineWidth=ow;g.strokeRect(ow/2,ow/2,W-ow,H-ow);
   // etichetta centrale come nelle pixelmap professionali
-  const big=Math.max(16,Math.round(Math.min(W*.06,H*.16))), sm=Math.round(big*.42);
+  let big=Math.max(16,Math.round(Math.min(W*.14,H*.1)));{g.font='800 '+big+'px -apple-system,system-ui,sans-serif';const m=g.measureText(scr.name||'Schermo').width+big;if(m>W*.9)big=Math.max(14,Math.floor(big*W*.9/m))}const sm=Math.max(10,Math.round(big*.42));
   g.textAlign='center';g.textBaseline='middle';g.font=`800 ${big}px -apple-system,system-ui,sans-serif`;
   const l1=scr.name||'Schermo', l2=`W: ${W}  H: ${H}`, l3=`${c.cols} × ${c.rows} moduli · ${mw}×${mh} px`;
   const w1=g.measureText(l1).width;g.font=`700 ${sm}px -apple-system,system-ui,sans-serif`;const bw=Math.max(w1,g.measureText(l3).width)+big;const bh=big*1.2+sm*2.9;
@@ -689,7 +686,7 @@ function pmDraw(g,c,t,scr){
   g.font=`700 ${sm}px -apple-system,system-ui,sans-serif`;g.fillText(l2,cx,cy-bh/2+big*1.35+sm*.7);g.fillStyle='rgba(255,255,255,.8)';g.fillText(l3,cx,cy-bh/2+big*1.35+sm*1.95);
   g.restore();
 }
-function pmScreen(i){const ev=curEv&&DB.events.find(x=>x.id===curEv);const s=ev&&ev.screens[+i];const c=s&&screenCalc(s);return c&&c.pxW&&c.pxH?{s,c,ev}:null}
+function pmScreen(i){const ev=curEv&&DB.events.find(x=>x.id===curEv);const s0=ev&&ev.screens[+i];const c=s0&&screenCalc(s0);return c&&c.pxW&&c.pxH?{s:{...s0,_i:+i},c,ev}:null}
 (function pmAnim(){const t=(performance.now()/1000)%PM_LOOP;
   document.querySelectorAll('canvas[data-pm]').forEach(cv=>{const o=pmScreen(cv.dataset.pm);if(o)pmDraw(cv.getContext('2d'),o.c,t,o.s)});
   requestAnimationFrame(pmAnim)})();
