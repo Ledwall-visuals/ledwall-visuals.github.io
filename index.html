@@ -533,7 +533,8 @@ function vEvent(id){
       <div><label>Direzione</label><select data-sf="cabDir"><option value="col" ${(s.cabDir||'col')==='col'?'selected':''}>Per colonne ↕</option><option value="row" ${s.cabDir==='row'?'selected':''}>Per file ↔</option></select></div>`}
       <div><label>Moduli max per porta</label><input type="number" step="1" min="1" data-sf="cabMpp" value="${s.cabMpp||12}"></div>
       <div><label>Distributore corrente</label><select data-sf="cabA">${[32,64].map(a=>`<option value="${a}" ${(+s.cabA||32)===a?'selected':''}>${a} A</option>`).join('')}</select></div>
-      <div style="grid-column:1/-1" class="mut">${cp.troppi.length?`<span class="bad">⚠️ Troppi moduli su ${cp.troppi.map(n=>'P'+n).join(', ')} (max ${cp.mpp})</span> · `:''}${s.cabMode==='man'&&cp.liberi?`<span class="bad">${cp.liberi} moduli senza cavo</span> · `:''}🔌 <b>${cp.ports}</b> porte dati (max ${cp.mpp} moduli per porta) · ⚡ <b>${cp.lines}</b> distributor${cp.lines>1?'i':'e'} da ${cp.A} A (max ${cp.mpl} moduli ciascuno${+c.it.watt?'':', manca il consumo del modulo'})</div>`})():''}</div></div>`;
+      <div><label>Moduli max per uscita</label><input type="number" step="1" min="1" data-sf="cabMpu" value="${cp.mpu}"></div>
+      <div style="grid-column:1/-1" class="mut">${cp.troppi.length?`<span class="bad">⚠️ Troppi moduli su ${cp.troppi.map(n=>'P'+n).join(', ')} (max ${cp.mpp})</span> · `:''}${s.cabMode==='man'&&cp.liberi?`<span class="bad">${cp.liberi} moduli senza cavo</span> · `:''}🔌 <b>${cp.ports}</b> porte dati (max ${cp.mpp} moduli per porta) · ⚡ <b>${cp.dist}</b> distributor${cp.dist>1?'i':'e'} da ${cp.A} A con 5 uscite (max ${cp.mpu} moduli per uscita, ${cp.mpd} per distributore${+c.it.watt?'':', manca il consumo del modulo'})</div>`})():''}</div></div>`;
     } else h+=`<p class="bad">Aggiungi prima un tipo di cassa LED nell'inventario.</p>`;
     h+='</div>';
   });
@@ -669,9 +670,11 @@ function cabPlan(c,s){
   if(s.cabMode==='man')chains=((s.cabMan&&s.cabMan.ports)||[[]]).map(ch=>ch.filter(([k,r])=>k<c.cols&&r<c.rows));
   else for(let i=0;i<order.length;i+=mpp)chains.push(order.slice(i,i+mpp));
   if(!chains.length)chains=[[]];
-  const all=chains.flat(), mpl=watt?Math.max(1,Math.floor(A*230/watt)):Math.max(1,all.length);
-  const pos={};let g=0;chains.forEach((ch,p)=>ch.forEach(([k,r],i)=>{pos[k+','+r]={p:p+1,idx:i+1,l:Math.floor(g++/mpl)+1}}));
-  return {order,chains,mpp,mpl,ports:chains.length,lines:Math.max(1,Math.ceil(all.length/mpl)),pos,A,liberi:c.cols*c.rows-all.length,troppi:chains.map((ch,i)=>ch.length>mpp?i+1:0).filter(Boolean)};
+  // corrente: distributori da A ampere con 5 uscite; ogni uscita alimenta al massimo mpu moduli (16 A di base)
+  const all=chains.flat(), mpu=Math.max(1,Math.round(+s.cabMpu||(watt?Math.floor(16*230/watt):10)));
+  const mpd=Math.max(1,Math.min(5*mpu,watt?Math.floor(A*230/watt):5*mpu));
+  const pos={};let g=0;chains.forEach((ch,p)=>ch.forEach(([k,r],i)=>{const d=Math.floor(g/mpd),u=Math.floor((g%mpd)/mpu);g++;pos[k+','+r]={p:p+1,idx:i+1,d:d+1,u:u+1}}));
+  return {order,chains,mpp,mpu,mpd,ports:chains.length,dist:Math.max(1,Math.ceil(all.length/mpd)),pos,A,liberi:c.cols*c.rows-all.length,troppi:chains.map((ch,i)=>ch.length>mpp?i+1:0).filter(Boolean)};
 }
 function pmDraw(g,c,t,scr){
   const W=c.pxW,H=c.pxH,mw=c.it.pxW,mh=c.it.pxH;
@@ -684,7 +687,7 @@ function pmDraw(g,c,t,scr){
     for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){g.fillStyle=((k*nx+i)+(r*ny+j))%2?C2:C1;g.fillRect(x0+i*qw,y0+j*qh,qw+.5,qh+.5)}
     g.strokeStyle=`hsl(${hue},45%,18%)`;g.lineWidth=fw;g.strokeRect(x0+fw/2,y0+fw/2,mw-fw,mh-fw);
     // numero del modulo, al centro
-    const fs=Math.max(9,Math.round(qw*.36)), lab=cp?`P${cp.p} · ${cp.idx}`:`${n+1}`, pos=cp?`⚡ L${cp.l}`:`C${k+1} · F${r+1}`, mx=x0+mw/2, my=cp?y0+mh*.24:y0+mh/2;
+    const fs=Math.max(9,Math.round(qw*.36)), lab=cp?`P${cp.p} · ${cp.idx}`:`${n+1}`, pos=cp?`⚡ D${cp.d} · U${cp.u}`:`C${k+1} · F${r+1}`, mx=x0+mw/2, my=cp?y0+mh*.24:y0+mh/2;
     g.textAlign='center';g.textBaseline='middle';
     g.font=`600 ${Math.round(fs*.6)}px -apple-system,system-ui,sans-serif`;const pw=g.measureText(pos).width;
     g.font=`800 ${fs}px -apple-system,system-ui,sans-serif`;const bw=Math.max(g.measureText(lab).width,pw)+fs*.8, bh=fs*2;
