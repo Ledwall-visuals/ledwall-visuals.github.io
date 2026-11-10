@@ -720,7 +720,7 @@ document.addEventListener('change',async e=>{const t=e.target;if(!USER||!t.datas
 
 /* ---------- Widget iPhone ---------- */
 const FEED_BASE='https://rliekssnvssbpkjzpash.supabase.co/functions/v1/feed';
-const SITO_URL='https://beniamincuric-design.github.io/Gestionale-ledwall/';
+const SITO_URL='https://ledwall-visuals.github.io/';
 let FEEDTOK=null;
 async function loadTok(){if(!USER||FEEDTOK)return;const {data}=await sb.from('feed_token').select('token').eq('id',1).maybeSingle();if(data){FEEDTOK=data.token;if(view==='backup')render()}}
 function scriptable(){return `// Gestionale Ledwall – widget per Scriptable (si aggiorna da solo)
@@ -728,7 +728,7 @@ function scriptable(){return `// Gestionale Ledwall – widget per Scriptable (s
 const FEED_TOKEN = "${FEEDTOK}";
 const SOLO_TURNI = ${!isAdmin()};
 const IO = "${esc(first(myName()))}";
-const CODE_URL = "https://api.github.com/repos/beniamincuric-design/Gestionale-ledwall/contents/widget.js";
+const CODE_URL = "https://api.github.com/repos/Ledwall-visuals/ledwall-visuals.github.io/contents/widget.js";
 const fm = FileManager.local(), f = fm.joinPath(fm.documentsDirectory(), "ledwall-widget.js");
 let code;
 try { const rq = new Request(CODE_URL); rq.headers = { Accept: "application/vnd.github.raw" }; code = await rq.loadString(); if (!code.includes("ListWidget")) throw 0; fm.writeString(f, code); }
