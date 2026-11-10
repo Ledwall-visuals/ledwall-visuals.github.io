@@ -52,7 +52,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
 .preview{display:grid;gap:2px;margin-top:10px;max-width:100%;overflow:auto}
 .evgrid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
 .evgrid>div>.card{margin-bottom:16px}
-@media(min-width:1100px){main.wide{max-width:1760px}.evgrid{grid-template-columns:300px minmax(0,1fr) 360px;align-items:start}.evgrid{height:calc(100vh - 114px);align-items:stretch!important}.evgrid>div{min-height:0;height:100%;overflow:auto}.evgrid>.evc{scrollbar-width:thin}main.wide{padding-bottom:12px}.evgrid>.evl{display:flex;flex-direction:column;overflow:hidden}.evgrid>.evl>*{flex:none}.evgrid>.evr{display:flex;flex-direction:column;overflow:hidden}.evgrid>.evr>*{flex:none}.evgrid>.evr>.evrs{flex:1 1 auto;min-height:0;overflow:auto}.evgrid>.evl>.scrlist{flex:1 1 auto;min-height:120px;overflow:auto;margin-bottom:0}}
+@media(min-width:1100px){main.wide{max-width:1760px}.evgrid{grid-template-columns:300px minmax(0,1fr) 360px;align-items:start}.evgrid{height:calc(100vh - 114px);align-items:stretch!important}.evgrid>div{min-height:0;height:100%;overflow:auto}.evgrid>.evc{scrollbar-width:thin}main.wide{padding-bottom:12px}html.evpage,html.evpage body{overflow:hidden;height:100%}.evgrid>.evl{display:flex;flex-direction:column;overflow:hidden}.evgrid>.evl>*{flex:none}.evgrid>.evr{display:flex;flex-direction:column;overflow:hidden}.evgrid>.evr>*{flex:none}.evgrid>.evr>.evrs{flex:1 1 auto;min-height:0;overflow:auto}.evgrid>.evl>.scrlist{flex:1 1 auto;min-height:120px;overflow:auto;margin-bottom:0}}
 .scrlist .scrrow{padding:10px 12px;margin:6px 0}
 .seg{display:flex;background:var(--panel2);border-radius:10px;padding:3px;margin-top:10px}.seg button{flex:1;border:0;background:none;color:var(--mut);font:inherit;font-weight:600;padding:7px 0;border-radius:8px;cursor:pointer}.seg button.on{background:var(--acc);color:#fff}
 .mat{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:.5px solid var(--line)}.mat:last-child{border:0}
@@ -88,7 +88,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
 .task.fatto .tt{text-decoration:line-through;color:var(--mut)}
 @media(max-width:600px){main{padding:10px}.calcell{min-height:56px;padding:3px}.dav{width:20px;height:20px;font-size:9px}}
 .done td{text-decoration:line-through;color:var(--mut)}
-@media print{
+@media print{html.evpage,html.evpage body{overflow:visible!important;height:auto!important}.evgrid{height:auto!important}.evgrid>div{height:auto!important;overflow:visible!important;max-height:none!important}
   header,nav,.noprint{display:none!important}
   body{background:#fff;color:#000}
   .card{border:1px solid #999;background:#fff}
@@ -433,7 +433,7 @@ function render(){
   const app=document.getElementById('app');
   app.innerHTML = (ANTEPRIMA&&realAdmin()?`<div class="card" style="border:1px solid var(--acc)"><div class="row"><b>👁 Anteprima: vedi il sito come Lucas, Matteo ed Edo</b><span class="sp"></span><button class="btn sm" data-ante="0">Esci dall'anteprima</button></div></div>`:'')
     + (curEv? vEvent(curEv) : ({eventi:vEvents,inventario:adm?vInv:vInvRO,assenze:vAssenze,calendario:vHome,registro:vLog,backup:adm?vBackup:vWidget,task:vTask,turni:vTurni}[view]||vCal)());
-  app.classList.toggle('wide',!!curEv);
+  app.classList.toggle('wide',!!curEv);document.documentElement.classList.toggle('evpage',!!curEv);if(curEv)scrollTo(0,0);
   bind(); drawPresence(); if(typeof track==='function'&&CH)track();
 }
 
@@ -509,7 +509,7 @@ function vEvent(id){
   const dati=window.EVDATI===ev.id;
   let h=`<div class="evgrid">`;
   const topL=`<div class="row noprint" style="margin-bottom:12px"><button class="btn sec" data-act="back">← Eventi</button></div>`;
-  const topR=`<div class="row noprint" style="margin-bottom:12px;justify-content:flex-end"><button class="btn sec" data-act="dupEv">Duplica</button>${IN_FRAME?'':'<button class="btn sec" onclick="window.print()">🖨️ Stampa</button>'}<button class="btn bad" data-act="delEv">Elimina</button></div>`;
+  const topR=`<div class="row noprint" style="margin-bottom:12px;justify-content:flex-end;gap:6px"><button class="btn sec sm" data-act="dupEv">Duplica</button>${IN_FRAME?'':'<button class="btn sec sm" onclick="window.print()">🖨️ Stampa</button>'}<button class="btn bad sm" data-act="delEv">Elimina</button></div>`;
 
   // ===== SINISTRA: crea / modifica schermo =====
   let L=`<div class="card"><div class="row"><h2 style="margin:0">${s?'✏️ Schermo':'Schermi'}</h2><span class="sp"></span><button class="btn noprint" data-act="addScreen">+ Nuovo</button></div>`;
