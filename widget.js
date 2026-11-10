@@ -27,7 +27,7 @@ const calNomi = ((parti.find(x => /^lavoro=/i.test(x)) || "").split("=")[1] || "
 const hm = dt => pad(dt.getHours()) + ":" + pad(dt.getMinutes());
 let lavoro = [];
 try {
-  const cals = (await Calendar.forEvents()).filter(c => calNomi.length ? calNomi.includes(c.title.trim().toLowerCase()) : /^(mattin[ao]|pomeriggio|notte)$|lavoro|work/i.test(c.title.trim()));
+  const cals = (await Calendar.forEvents()).filter(c => calNomi.length ? calNomi.includes(c.title.trim().toLowerCase()) : /^(mattin[ao]|pomeriggio|notte)$/i.test(c.title.trim()));
   if (cals.length) {
     const da = new Date(); da.setDate(1); da.setDate(da.getDate() - 7); da.setHours(0, 0, 0, 0);
     const a = new Date(da); a.setDate(a.getDate() + 60);
@@ -52,8 +52,10 @@ function intervallo(l) {
   return [a, b];
 }
 // barra dei turni di lavoro su una settimana: una riga continua da lunedì all'ora di inizio fino all'ora di fine
-function barreSettimana(lunedi, larg, alt, cw, gap) {
+function barreSettimana(lunedi, larg, alt, cw, gap, celle) {
   const c = new DrawContext(); c.size = new Size(larg, alt); c.opaque = false; c.respectScreenScale = true;
+  // sfondo delle celle disegnato qui sotto, così le barre stanno sopra e restano piene
+  (celle || []).forEach((k, i) => { if (!k) return; const p = new Path(); p.addRoundedRect(new Rect(i * (cw + gap), 0, cw, alt), 6, 6); c.addPath(p); c.setFillColor(new Color("#ffffff", k === "dim" ? 0.03 : 0.08)); c.fillPath(); });
   const t0 = new Date(lunedi); t0.setHours(0, 0, 0, 0); const t1 = new Date(t0); t1.setDate(t1.getDate() + 7);
   const xOf = dt => { const g = (dt - t0) / 864e5; const di = Math.min(6, Math.max(0, Math.floor(g))); return Math.min(larg, Math.max(0, di * (cw + gap) + (g - di) * cw)); };
   // mese corrente: la parte di barra fuori dal mese è trasparente, come i giorni del calendario
@@ -72,11 +74,11 @@ function barreSettimana(lunedi, larg, alt, cw, gap) {
     const ia = Math.max(x0, xm0), ib = Math.min(x1, xm1), dentro = ib - ia > 1;
     // parte fuori dal mese: trasparente; parte nel mese: piena (gli angoli restano dritti sul confine del mese)
     if (!dentro || ia > x0 || ib < x1) bar(x0, x1, 0.22);
-    if (dentro) { bar(ia, ib, 0.9); c.setFillColor(new Color(col, 0.9)); if (ia > x0) c.fillRect(new Rect(ia, y, 4, hb)); if (ib < x1) c.fillRect(new Rect(ib - 4, y, 4, hb)); }
+    if (dentro) { bar(ia, ib, 1); c.setFillColor(new Color(col, 1)); if (ia > x0) c.fillRect(new Rect(ia, y, 4, hb)); if (ib < x1) c.fillRect(new Rect(ib - 4, y, 4, hb)); }
     const ta = dentro ? ia : x0, tb = dentro ? ib : x1;
     if (tb - ta > 24) { c.setFont(Font.heavySystemFont(8)); c.setTextColor(new Color("#ffffff", dentro ? 1 : 0.45)); c.setTextAlignedCenter(); c.drawTextInRect((l.cal || "Lavoro").toUpperCase(), new Rect(ta, y + 4, tb - ta, hb)); }
   });
-  return n ? c.getImage() : null;
+  return c.getImage();
 }
 // prossima domenica (oggi compreso)
 const nx = (d.turni || []).find(t => t.data >= today);
@@ -158,12 +160,12 @@ if (mode.toLowerCase().startsWith("task")) {
   w.addSpacer(2);
   for (let r = 0; r < rows; r++) {
     const row = w.addStack(); row.spacing = 2;
-    if (days[r * 7]) { const img = barreSettimana(days[r * 7].dt, 7 * cw + 12, ch, cw, 2); if (img) row.backgroundImage = img; }
+    if (days[r * 7]) { const celle = days.slice(r * 7, r * 7 + 7).map(x => !x || x.blank ? null : x.extra ? "dim" : "ok"); const img = barreSettimana(days[r * 7].dt, 7 * cw + 12, ch, cw, 2, celle); if (img) row.backgroundImage = img; }
     for (let i = 0; i < 7; i++) {
       const it = days[r * 7 + i]; const cell = row.addStack(); cell.size = new Size(cw, ch); cell.layoutVertically(); cell.cornerRadius = 6;
       if (!it || it.blank) continue;
       const s = ds(it.dt), dim = !!it.extra;
-      cell.backgroundColor = new Color("#ffffff", dim ? 0.03 : 0.08); // oggi: cornice disegnata dietro le barre
+      // sfondo cella e cornice di oggi sono disegnati nell'immagine della riga (sotto le barre)
       cell.setPadding(2, 3, 2, 2);
       const top = cell.addStack(); top.centerAlignContent();
       txt(top, String(it.dt.getDate()), Font.semiboldSystemFont(10), dim ? new Color("#7d8491", 0.6) : (s === today ? TX : MUT));
