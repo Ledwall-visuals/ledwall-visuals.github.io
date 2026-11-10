@@ -52,10 +52,11 @@ label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
 .preview{display:grid;gap:2px;margin-top:10px;max-width:100%;overflow:auto}
 .evgrid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
 .evgrid>div>.card{margin-bottom:16px}
-@media(min-width:1100px){main.wide{max-width:1760px}.evgrid{grid-template-columns:300px minmax(0,1fr) 360px;align-items:start}.evgrid{height:calc(100vh - 114px);align-items:stretch!important}.evgrid>div{min-height:0;height:100%;overflow:auto}.evgrid>.evc{scrollbar-width:thin}main.wide{padding-bottom:12px}html.evpage,html.evpage body{overflow:hidden;height:100%}.evgrid>.evl{display:flex;flex-direction:column;overflow:hidden}.evgrid>.evl>*{flex:none}.evgrid>.evr{display:flex;flex-direction:column;overflow:hidden}.evgrid>.evr>*{flex:none}.evgrid>.evr>.evrs{flex:1 1 auto;min-height:0;overflow:auto}.evgrid>.evl>.scrlist{flex:1 1 auto;min-height:120px;overflow:auto;margin-bottom:0}}
+@media(min-width:1100px){main.wide{max-width:1760px}.evgrid{grid-template-columns:300px minmax(0,1fr) 360px;align-items:start}.evgrid{height:calc(100vh - 114px);align-items:stretch!important}.evgrid>div{min-height:0;height:100%;overflow:auto}.evgrid>.evc{scrollbar-width:thin}main.wide{padding-bottom:12px}html.evpage .navx{display:flex}html.evpage .evtop{display:none}html.evpage,html.evpage body{overflow:hidden;height:100%}.evgrid>.evl{display:flex;flex-direction:column;overflow:hidden}.evgrid>.evl>*{flex:none}.evgrid>.evr{display:flex;flex-direction:column;overflow:hidden}.evgrid>.evr>*{flex:none}.evgrid>.evr>.evrs{flex:1 1 auto;min-height:0;overflow:auto}.evgrid>.evl>.scrlist{flex:1 1 auto;min-height:120px;overflow:auto;margin-bottom:0}}
 .scrlist .scrrow{padding:10px 12px;margin:6px 0}
 .seg{display:flex;background:var(--panel2);border-radius:10px;padding:3px;margin-top:10px}.seg button{flex:1;border:0;background:none;color:var(--mut);font:inherit;font-weight:600;padding:7px 0;border-radius:8px;cursor:pointer}.seg button.on{background:var(--acc);color:#fff}
 .mat{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:.5px solid var(--line)}.mat:last-child{border:0}
+.navx{display:none;position:absolute;top:50%;transform:translateY(-50%);gap:6px;align-items:center}.navx.l{left:16px}.navx.r{right:16px}.navx .row{margin:0!important;gap:6px}
 .pmbox{margin-top:12px}.scrrow{cursor:pointer}.scrrow:hover{background:var(--panel2)}.pm{display:block;max-width:100%;height:auto;margin:0 auto;border-radius:10px;background:#000}
 .preview i{display:block;background:#2a4f8f;border-radius:2px}
 .evlist .ev{display:flex;gap:12px;align-items:center;padding:10px;border-bottom:1px solid var(--line);cursor:pointer}
@@ -181,7 +182,7 @@ th,td{border-bottom:.5px solid var(--line)}
   <h1><span class="logo"><i></i><i></i><i></i><i></i><i></i><i></i></span>Ledwall</h1>
   <span class="sp"></span><span id="online"></span><span id="saveSt"></span><button id="pwbtn" style="display:none" aria-label="Profilo">👤</button><button class="btn sec sm" id="logout" style="display:none">Esci</button>
 </header>
-  <nav id="nav">
+  <nav id="nav"><div class="navx l noprint" id="navL"></div><div class="navx r noprint" id="navR"></div>
     <button data-v="calendario"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg>Home</button>
     <button data-v="eventi"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Eventi</button>
     <button data-v="turni"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.4-.3 4.1 1.3 4.6 4.3"/></svg>Turni</button>
@@ -422,7 +423,7 @@ function needs(ev){
 let view='calendario', curEv=null;
 try{const u=JSON.parse(sessionStorage.getItem(KEY+'-ui'));if(u){view=u.view||view;curEv=u.curEv||null}}catch(e){}
 if(location.hash.length>1){view=decodeURIComponent(location.hash.slice(1));curEv=null;history.replaceState(null,'',location.pathname)}
-document.getElementById('nav').onclick=e=>{const b=e.target.closest('[data-v]');const v=b&&b.dataset.v;if(v){view=v;curEv=null;rememberUI();render()}};
+document.getElementById('nav').onclick=e=>{const x=e.target.closest('.navx [data-act]');if(x){const t=document.querySelector(`#app [data-act="${x.dataset.act}"]`);t&&t.click();return}const b=e.target.closest('[data-v]');const v=b&&b.dataset.v;if(v){view=v;curEv=null;rememberUI();render()}};
 function rememberUI(){try{sessionStorage.setItem(KEY+'-ui',JSON.stringify({view,curEv}))}catch(e){}}
 function render(){
   const adm=isAdmin(); if(!adm){curEv=null;if(!VISTE_UTENTE.includes(view))view='calendario'}
@@ -433,7 +434,7 @@ function render(){
   const app=document.getElementById('app');
   app.innerHTML = (ANTEPRIMA&&realAdmin()?`<div class="card" style="border:1px solid var(--acc)"><div class="row"><b>👁 Anteprima: vedi il sito come Lucas, Matteo ed Edo</b><span class="sp"></span><button class="btn sm" data-ante="0">Esci dall'anteprima</button></div></div>`:'')
     + (curEv? vEvent(curEv) : ({eventi:vEvents,inventario:adm?vInv:vInvRO,assenze:vAssenze,calendario:vHome,registro:vLog,backup:adm?vBackup:vWidget,task:vTask,turni:vTurni}[view]||vCal)());
-  app.classList.toggle('wide',!!curEv);document.documentElement.classList.toggle('evpage',!!curEv);if(curEv)scrollTo(0,0);
+  app.classList.toggle('wide',!!curEv);document.documentElement.classList.toggle('evpage',!!curEv);{const tl=app.querySelector('.evtopL'),tr=app.querySelector('.evtopR');document.getElementById('navL').innerHTML=curEv&&tl?tl.innerHTML:'';document.getElementById('navR').innerHTML=curEv&&tr?tr.innerHTML:''}if(curEv)scrollTo(0,0);
   bind(); drawPresence(); if(typeof track==='function'&&CH)track();
 }
 
@@ -508,8 +509,8 @@ function vEvent(id){
   const i=window.SCROPEN, s=i>=0?ev.screens[i]:null, c=s?screenCalc(s):null;
   const dati=window.EVDATI===ev.id;
   let h=`<div class="evgrid">`;
-  const topL=`<div class="row noprint" style="margin-bottom:12px"><button class="btn sec" data-act="back">← Eventi</button></div>`;
-  const topR=`<div class="row noprint" style="margin-bottom:12px;justify-content:flex-end;gap:6px"><button class="btn sec sm" data-act="dupEv">Duplica</button>${IN_FRAME?'':'<button class="btn sec sm" onclick="window.print()">🖨️ Stampa</button>'}<button class="btn bad sm" data-act="delEv">Elimina</button></div>`;
+  const topL=`<div class="row noprint evtop evtopL" style="margin-bottom:12px"><button class="btn sec sm" data-act="back">← Eventi</button></div>`;
+  const topR=`<div class="row noprint evtop evtopR" style="margin-bottom:12px;justify-content:flex-end;gap:6px"><button class="btn sec sm" data-act="dupEv">Duplica</button>${IN_FRAME?'':'<button class="btn sec sm" onclick="window.print()">🖨️ Stampa</button>'}<button class="btn bad sm" data-act="delEv">Elimina</button></div>`;
 
   // ===== SINISTRA: crea / modifica schermo =====
   let L=`<div class="card"><div class="row"><h2 style="margin:0">${s?'✏️ Schermo':'Schermi'}</h2><span class="sp"></span><button class="btn noprint" data-act="addScreen">+ Nuovo</button></div>`;
