@@ -696,7 +696,7 @@ function scriptable(){return `// Gestionale Ledwall – widget per Scriptable (s
 // Parametro del widget: calendario | task | checklist | checklist:Nome
 const FEED_TOKEN = "${FEEDTOK}";
 const SOLO_TURNI = ${!isAdmin()};
-const CODE_URL = "${SITO_URL}/widget.js";
+const CODE_URL = "https://raw.githubusercontent.com/beniamincuric-design/Gestionale-ledwall/main/widget.js";
 const fm = FileManager.local(), f = fm.joinPath(fm.documentsDirectory(), "ledwall-widget.js");
 let code;
 try { code = await new Request(CODE_URL + "?v=" + Date.now()).loadString(); if (!code.includes("ListWidget")) throw 0; fm.writeString(f, code); }
