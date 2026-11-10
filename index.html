@@ -524,7 +524,13 @@ function vEvent(id){
       <div><b>${c.kg.toFixed(0)} kg</b><span>peso moduli</span></div>
       <div><b>${(c.watt/1000).toFixed(1)} kW</b><span>consumo max (~${Math.ceil(c.watt/230)} A a 230V)</span></div></div>`;
       h+=`<div class="pmbox">${(()=>{const k=Math.min(900/Math.max(1,c.pxW),340/Math.max(1,c.pxH)),dw=Math.round(c.pxW*k),dh=Math.round(c.pxH*k);return `<canvas class="pm" data-pm="${i}" width="${dw*2}" height="${dh*2}" style="width:${dw}px"></canvas>`})()}
-      <div class="row noprint" style="margin-top:8px"><b style="flex:1">🎯 Pixelmap ${c.pxW} × ${c.pxH}</b><button class="btn sm" data-pmvid="${i}">🎬 Scarica video loop</button><button class="btn sec sm" data-pmpng="${i}">🖼 PNG</button></div></div>`;
+      <div class="row noprint" style="margin-top:8px"><b style="flex:1">🎯 Pixelmap ${c.pxW} × ${c.pxH}</b><button class="btn sm" data-pmvid="${i}">🎬 Scarica video loop</button><button class="btn sec sm" data-pmpng="${i}">🖼 PNG</button></div>
+      <div class="grid noprint" style="margin-top:8px"><div><label>Vista</label><select data-sf="cabOn"><option value="">🎯 Pixelmap</option><option value="1" ${s.cabOn==='1'?'selected':''}>🔌 Cablaggio</option></select></div>
+      ${s.cabOn==='1'?(()=>{const cp=cabPlan(c,s);return `<div><label>Partenza</label><select data-sf="cabStart">${[['BL','In basso a sinistra'],['BR','In basso a destra'],['TL','In alto a sinistra'],['TR','In alto a destra']].map(([v,l])=>`<option value="${v}" ${(s.cabStart||'BL')===v?'selected':''}>${l}</option>`).join('')}</select></div>
+      <div><label>Direzione</label><select data-sf="cabDir"><option value="col" ${(s.cabDir||'col')==='col'?'selected':''}>Per colonne ↕</option><option value="row" ${s.cabDir==='row'?'selected':''}>Per file ↔</option></select></div>
+      <div><label>Pixel max per porta</label><input type="number" data-sf="cabPx" value="${s.cabPx||650000}"></div>
+      <div><label>Ampere per linea</label><input type="number" data-sf="cabA" value="${s.cabA||16}"></div>
+      <div style="grid-column:1/-1" class="mut">🔌 <b>${cp.ports}</b> porte dati (max ${cp.mpp} moduli per porta) · ⚡ <b>${cp.lines}</b> linee di corrente da ${cp.A} A (max ${cp.mpl} moduli per linea${+c.it.watt?'':', manca il consumo del modulo'})</div>`})():''}</div></div>`;
     } else h+=`<p class="bad">Aggiungi prima un tipo di cassa LED nell'inventario.</p>`;
     h+='</div>';
   });
@@ -648,24 +654,36 @@ document.addEventListener('click',async e=>{
 
 /* ---------- Pixelmap animata (loop con radar) ---------- */
 const PM_LOOP=4; // secondi di un giro del radar = durata del loop
+const CAB_COL=['#ffd60a','#0a84ff','#ff375f','#30d158','#bf5af2','#ff9f0a','#64d2ff','#ffffff'];
+// cablaggio a serpentina: ordine dei moduli, porte dati (pixel max per porta) e linee di corrente (ampere)
+function cabPlan(c,s){
+  const start=s.cabStart||'BL', dir=s.cabDir||'col', px=+s.cabPx||650000, A=+s.cabA||16, watt=+c.it.watt||0;
+  const fromRight=start[1]==='R', fromBottom=start[0]==='B', order=[];
+  if(dir==='col'){for(let a=0;a<c.cols;a++){const k=fromRight?c.cols-1-a:a;for(let b=0;b<c.rows;b++){const up=(a%2===0)===fromBottom;order.push([k,up?c.rows-1-b:b])}}}
+  else{for(let a=0;a<c.rows;a++){const r=fromBottom?c.rows-1-a:a;for(let b=0;b<c.cols;b++){const lr=(a%2===0)!==fromRight;order.push([lr?b:c.cols-1-b,r])}}}
+  const mpp=Math.max(1,Math.floor(px/(c.it.pxW*c.it.pxH))), mpl=watt?Math.max(1,Math.floor(A*230/watt)):order.length;
+  const pos={};order.forEach(([k,r],i)=>pos[k+','+r]={p:Math.floor(i/mpp)+1,idx:i%mpp+1,l:Math.floor(i/mpl)+1});
+  return {order,mpp,mpl,ports:Math.ceil(order.length/mpp),lines:Math.ceil(order.length/mpl),pos,A};
+}
 function pmDraw(g,c,t,scr){
   const W=c.pxW,H=c.pxH,mw=c.it.pxW,mh=c.it.pxH;
   g.save();g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,g.canvas.width,g.canvas.height);g.scale(g.canvas.width/W,g.canvas.height/H);
   // un solo colore per schermo (tinta diversa per ogni schermo dell'evento), due tonalità a scacchiera sulle parti di ogni modulo
   const q=Math.min(mw,mh)/2, nx=Math.max(1,Math.round(mw/q)), ny=Math.max(1,Math.round(mh/q)), qw=mw/nx, qh=mh/ny;
   const hue=[350,180,110,285,30,210,320,55][(scr._i||0)%8], C1=`hsl(${hue},55%,62%)`, C2=`hsl(${hue},58%,40%)`;
-  const fw=Math.max(2,Math.round(Math.min(mw,mh)*.03));
-  for(let r=0;r<c.rows;r++)for(let k=0;k<c.cols;k++){const n=r*c.cols+k, x0=k*mw, y0=r*mh;
+  const fw=Math.max(2,Math.round(Math.min(mw,mh)*.03)), cab=scr.cabOn==='1'?cabPlan(c,scr):null;
+  for(let r=0;r<c.rows;r++)for(let k=0;k<c.cols;k++){const n=r*c.cols+k, x0=k*mw, y0=r*mh, cp=cab&&cab.pos[k+','+r];
     for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){g.fillStyle=((k*nx+i)+(r*ny+j))%2?C2:C1;g.fillRect(x0+i*qw,y0+j*qh,qw+.5,qh+.5)}
     g.strokeStyle=`hsl(${hue},45%,18%)`;g.lineWidth=fw;g.strokeRect(x0+fw/2,y0+fw/2,mw-fw,mh-fw);
     // numero del modulo, al centro
-    const fs=Math.max(9,Math.round(qw*.36)), lab=`${n+1}`, pos=`C${k+1} · F${r+1}`, mx=x0+mw/2, my=y0+mh/2;
+    const fs=Math.max(9,Math.round(qw*.36)), lab=cp?`P${cp.p} · ${cp.idx}`:`${n+1}`, pos=cp?`⚡ L${cp.l}`:`C${k+1} · F${r+1}`, mx=x0+mw/2, my=cp?y0+mh*.24:y0+mh/2;
     g.textAlign='center';g.textBaseline='middle';
     g.font=`600 ${Math.round(fs*.6)}px -apple-system,system-ui,sans-serif`;const pw=g.measureText(pos).width;
     g.font=`800 ${fs}px -apple-system,system-ui,sans-serif`;const bw=Math.max(g.measureText(lab).width,pw)+fs*.8, bh=fs*2;
     g.fillStyle='rgba(0,0,0,.55)';g.beginPath();g.roundRect?g.roundRect(mx-bw/2,my-bh/2,bw,bh,fs*.3):g.rect(mx-bw/2,my-bh/2,bw,bh);g.fill();
     g.fillStyle='#fff';g.fillText(lab,mx,my-fs*.32);
     g.fillStyle='rgba(255,255,255,.8)';g.font=`600 ${Math.round(fs*.6)}px -apple-system,system-ui,sans-serif`;g.fillText(pos,mx,my+fs*.55);}
+  if(cab){pmCab(g,c,t,scr,cab);g.restore();return}
   // radar dal centro (leggero)
   const cx=W/2,cy=H/2,R=Math.hypot(W,H)/2,a=t/PM_LOOP*Math.PI*2-Math.PI/2, lw=Math.max(2,Math.round(Math.min(mw,mh)/64));
   if(g.createConicGradient){const cg=g.createConicGradient(a-1,cx,cy);const k1=1/(Math.PI*2);cg.addColorStop(0,'rgba(255,255,255,0)');cg.addColorStop(k1,'rgba(255,255,255,.35)');cg.addColorStop(k1+.001,'rgba(255,255,255,0)');cg.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=cg;g.fillRect(0,0,W,H)}
@@ -685,6 +703,24 @@ function pmDraw(g,c,t,scr){
   g.fillStyle='#fff';g.font=`800 ${big}px -apple-system,system-ui,sans-serif`;g.fillText(l1,cx,cy-bh/2+big*.75);
   g.font=`700 ${sm}px -apple-system,system-ui,sans-serif`;g.fillText(l2,cx,cy-bh/2+big*1.35+sm*.7);g.fillStyle='rgba(255,255,255,.8)';g.fillText(l3,cx,cy-bh/2+big*1.35+sm*1.95);
   g.restore();
+}
+function pmCab(g,c,t,scr,cab){
+  const W=c.pxW,H=c.pxH,mw=c.it.pxW,mh=c.it.pxH,lw=Math.max(3,Math.round(Math.min(mw,mh)/22));
+  const cen=([k,r])=>[k*mw+mw/2,r*mh+mh/2];
+  for(let p=0;p<cab.ports;p++){const pts=cab.order.slice(p*cab.mpp,(p+1)*cab.mpp).map(cen), col=CAB_COL[p%CAB_COL.length];
+    g.lineCap='round';g.lineJoin='round';
+    g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=lw*1.9;g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.stroke();
+    g.strokeStyle=col;g.lineWidth=lw;g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.stroke();
+    // flusso del segnale che scorre (in loop)
+    g.strokeStyle='rgba(255,255,255,.85)';g.lineWidth=lw*.45;g.setLineDash([lw*1.2,lw*4.8]);g.lineDashOffset=-(t/PM_LOOP)*lw*6*8;
+    g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.stroke();g.setLineDash([]);
+    // frecce sui collegamenti
+    for(let i=1;i<pts.length;i++){const [x1,y1]=pts[i-1],[x2,y2]=pts[i],a=Math.atan2(y2-y1,x2-x1),mx=(x1+x2)/2,my=(y1+y2)/2,z=lw*1.6;
+      g.fillStyle=col;g.beginPath();g.moveTo(mx+Math.cos(a)*z,my+Math.sin(a)*z);g.lineTo(mx+Math.cos(a+2.5)*z,my+Math.sin(a+2.5)*z);g.lineTo(mx+Math.cos(a-2.5)*z,my+Math.sin(a-2.5)*z);g.closePath();g.fill()}
+    // ingresso della porta
+    const [sx,sy]=pts[0],rr=lw*2.6;g.fillStyle=col;g.beginPath();g.arc(sx,sy,rr,0,Math.PI*2);g.fill();g.strokeStyle='#000';g.lineWidth=lw*.4;g.stroke();
+    g.fillStyle='#000';g.font=`900 ${Math.round(rr*1.05)}px -apple-system,system-ui,sans-serif`;g.textAlign='center';g.textBaseline='middle';g.fillText('P'+(p+1),sx,sy+rr*.05);}
+  const ow=Math.max(3,lw*.7);g.strokeStyle='#fff';g.lineWidth=ow;g.strokeRect(ow/2,ow/2,W-ow,H-ow);
 }
 function pmScreen(i){const ev=curEv&&DB.events.find(x=>x.id===curEv);const s0=ev&&ev.screens[+i];const c=s0&&screenCalc(s0);return c&&c.pxW&&c.pxH?{s:{...s0,_i:+i},c,ev}:null}
 (function pmAnim(){const t=(performance.now()/1000)%PM_LOOP;
