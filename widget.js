@@ -22,19 +22,22 @@ const taskOn = s => (d.task || []).filter(t => t.scadenza === s);
 // Turni di lavoro dal Calendario dell'iPhone: calendario il cui nome contiene "lavoro" (o "work"),
 // oppure quello indicato nel parametro, es. "calendario;lavoro=Turni ufficio"
 const parti = String(args.widgetParameter || "").split(";").map(x => x.trim());
-const calNome = ((parti.find(x => /^lavoro=/i.test(x)) || "").split("=")[1] || "").trim().toLowerCase();
+// default: i calendari "Mattina", "Pomeriggio", "Notte" (o con "lavoro"/"work" nel nome); lavoro=A,B,C per sceglierli
+const calNomi = ((parti.find(x => /^lavoro=/i.test(x)) || "").split("=")[1] || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
 const hm = dt => pad(dt.getHours()) + ":" + pad(dt.getMinutes());
 let lavoro = [];
 try {
-  const cals = (await Calendar.forEvents()).filter(c => calNome ? c.title.toLowerCase() === calNome : /lavoro|work/i.test(c.title));
+  const cals = (await Calendar.forEvents()).filter(c => calNomi.length ? calNomi.includes(c.title.trim().toLowerCase()) : /^(mattin[ao]|pomeriggio|notte)$|lavoro|work/i.test(c.title.trim()));
   if (cals.length) {
     const da = new Date(); da.setDate(1); da.setDate(da.getDate() - 7); da.setHours(0, 0, 0, 0);
     const a = new Date(da); a.setDate(a.getDate() + 60);
-    lavoro = (await CalendarEvent.between(da, a, cals)).map(e => ({ s: e.startDate, e: e.endDate, all: e.isAllDay, t: e.title, col: e.calendar.color }));
+    lavoro = (await CalendarEvent.between(da, a, cals)).map(e => ({ s: e.startDate, e: e.endDate, all: e.isAllDay, t: e.title, cal: e.calendar.title, col: e.calendar.color }));
   }
 } catch (e) { lavoro = []; }
 const lavOn = s => lavoro.filter(l => ds(l.s) === s);
-const lavTxt = l => l.all ? (l.t || "Lavoro") : hm(l.s).replace(":00", "") + "–" + hm(l.e).replace(":00", "");
+const orario = l => l.all ? "" : hm(l.s).replace(":00", "") + "–" + hm(l.e).replace(":00", "");
+// nella cella: nome del turno (calendario), es. "Mattina"; se il calendario è generico, l'orario
+const lavTxt = l => /^(mattin[ao]|pomeriggio|notte)$/i.test((l.cal || "").trim()) ? l.cal.trim() : (orario(l) || l.t || "Lavoro");
 // prossima domenica (oggi compreso)
 const nx = (d.turni || []).find(t => t.data >= today);
 const nxNome = nx ? (nx.mattina === nx.sera ? first(nx.mattina) : [nx.mattina, nx.sera].filter(Boolean).map(first).join(" / ")) : "";
@@ -86,7 +89,7 @@ if (mode.toLowerCase().startsWith("task")) {
     else { [nx.mattina, nx.sera].forEach((n, i) => { const s = r.addStack(); s.layoutVertically(); const im = s.addImage(circle(n, 34)); im.imageSize = new Size(34, 34); txt(s, (i ? "🌙 " : "☀️ ") + first(n), Font.systemFont(10)); r.addSpacer(8); }); }
   }
   const pl = lavoro.filter(l => l.e > new Date()).sort((a, b) => a.s - b.s)[0];
-  if (pl) { w.addSpacer(8); const g = ds(pl.s) === today ? "Oggi" : pl.s.toLocaleDateString("it-IT", { weekday: "short", day: "numeric" }); txt(w, "💼 " + g + " " + lavTxt(pl), Font.semiboldSystemFont(11), new Color("#ff9f0a")); }
+  if (pl) { w.addSpacer(8); const g = ds(pl.s) === today ? "Oggi" : pl.s.toLocaleDateString("it-IT", { weekday: "short", day: "numeric" }); txt(w, "💼 " + g + " · " + lavTxt(pl), Font.semiboldSystemFont(11), new Color(pl.col ? pl.col.hex : "#ff9f0a")); if (orario(pl) && lavTxt(pl) !== orario(pl)) txt(w, orario(pl), Font.systemFont(10), MUT); }
 } else {
   // calendario a griglia: large = mese intero (+ giorni fino alla domenica dopo), medium = settimana corrente e successiva
   const now = new Date(); const y = now.getFullYear(), mo = now.getMonth();
