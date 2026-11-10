@@ -50,7 +50,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
 .kpi span{color:var(--mut);font-size:12px}
 .screen{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
 .preview{display:grid;gap:2px;margin-top:10px;max-width:100%;overflow:auto}
-.pmbox{margin-top:12px}.pm{display:block;max-width:100%;height:auto;margin:0 auto;border-radius:10px;background:#000}
+.pmbox{margin-top:12px}.scrrow{cursor:pointer}.scrrow:hover{background:var(--panel2)}.pm{display:block;max-width:100%;height:auto;margin:0 auto;border-radius:10px;background:#000}
 .preview i{display:block;background:#2a4f8f;border-radius:2px}
 .evlist .ev{display:flex;gap:12px;align-items:center;padding:10px;border-bottom:1px solid var(--line);cursor:pointer}
 .evlist .ev:hover{background:var(--panel2)}
@@ -365,7 +365,7 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const fmtD=d=>d?new Date(d+'T00:00').toLocaleDateString('it-IT',{weekday:'short',day:'2-digit',month:'short',year:'numeric'}):'';
 
 /* ===================== CALCOLO ===================== */
-// Botex PSA 321: ingresso CEE 32 A trifase (3 × 32 A × 230 V), 6 prese Schuko da 16 A (2 per fase). Carico tenuto all'80%.
+// Distributore (Botex PSA 321): ingresso CEE 32 A trifase (3 × 32 A × 230 V), 6 prese Schuko da 16 A (2 per fase). Carico tenuto all'80%.
 function psa(watt){return Math.max(1,Math.ceil(watt/(3*32*230*0.8)))}
 function screenCalc(s){
   const it=item(s.ledId); if(!it) return null;
@@ -509,9 +509,11 @@ function vEvent(id){
   </div></div>
   <div class="card"><div class="row"><h2 style="margin:0">Schermi</h2><span class="sp"></span><button class="btn noprint" data-act="addScreen">+ Schermo</button></div>
   <p class="mut">Scegli se le misure sono in <b>moduli</b> (es. 3×2 moduli) o in <b>metri</b> (es. 3×2 m, arrotondato per eccesso). Scorta moduli di riserva: <input type="number" min="0" id="scorta" value="${DB.settings.scorta}" style="width:70px;display:inline-block"> %</p>`;
+  if(window.SCROPEN===undefined||window.SCREV!==ev.id){window.SCROPEN=(ev.screens||[]).length?0:-1;window.SCREV=ev.id}
   (ev.screens||[]).forEach((s,i)=>{
     const c=screenCalc(s);
-    h+=`<div class="screen" data-scr="${i}"><div class="grid">
+    if(i!==window.SCROPEN){h+=`<div class="screen scrrow" data-scropen="${i}"><div class="row" style="flex-wrap:nowrap"><div style="flex:1;min-width:0"><b>${esc(s.name||'Schermo')}</b><div class="mut">${c?`${c.cols}×${c.rows} moduli · ${c.mW.toFixed(1)}×${c.mH.toFixed(1)} m · ${c.pxW}×${c.pxH} px · ${(c.watt/1000).toFixed(1)} kW`:'—'}</div></div><span class="mut" style="font-size:20px">›</span></div></div>`;return}
+    h+=`<div class="screen" data-scr="${i}" style="border:1px solid var(--acc)"><div class="row noprint" style="margin-bottom:8px"><b style="flex:1">✏️ ${esc(s.name||'Schermo')}</b><button class="btn sm" data-scrclose="1">✓ Fatto</button></div><div class="grid">
       <div><label>Nome</label><input data-sf="name" value="${esc(s.name)}"></div>
       <div style="grid-column:span 2"><label>Tipo LED</label><select data-sf="ledId">${leds.map(l=>`<option value="${l.id}" ${s.ledId===l.id?'selected':''}>${esc(l.name)}</option>`).join('')}</select></div>
       <div><label>Unità</label><select data-sf="mode"><option value="moduli" ${s.mode!=='metri'?'selected':''}>moduli</option><option value="metri" ${s.mode==='metri'?'selected':''}>metri</option></select></div>
@@ -524,10 +526,16 @@ function vEvent(id){
       <div><b>${c.mW.toFixed(2)} × ${c.mH.toFixed(2)} m</b><span>misura reale</span></div>
       <div><b>${c.pxW} × ${c.pxH}</b><span>risoluzione px (${(c.pxW*c.pxH/1e6).toFixed(2)} MP)</span></div>
       <div><b>${c.kg.toFixed(0)} kg</b><span>peso moduli</span></div>
-      <div><b>${(c.watt/1000).toFixed(1)} kW</b><span>consumo max · ~${Math.ceil(c.watt/(Math.sqrt(3)*400))} A per fase in trifase${c.watt?` · ${psa(c.watt)} Botex PSA 321`:''}</span></div></div>`;
+      <div><b>${(c.watt/1000).toFixed(1)} kW</b><span>consumo max · ~${Math.ceil(c.watt/(Math.sqrt(3)*400))} A per fase in trifase${c.watt?` · ${psa(c.watt)} distributor${psa(c.watt)>1?'i':'e'}`:''}</span></div></div>`;
       h+=`<div class="pmbox">${(()=>{const k=Math.min(900/Math.max(1,c.pxW),340/Math.max(1,c.pxH)),dw=Math.round(c.pxW*k),dh=Math.round(c.pxH*k);return `<canvas class="pm" data-pm="${i}" width="${dw*2}" height="${dh*2}" style="width:${dw}px${s.cabOn==='1'&&s.cabMode==='man'?';touch-action:none;cursor:crosshair':''}"></canvas>`})()}
       <div class="row noprint" style="margin-top:8px"><b style="flex:1">🎯 Pixelmap ${c.pxW} × ${c.pxH}</b><button class="btn sm" data-pmvid="${i}">🎬 Scarica video loop</button><button class="btn sec sm" data-pmpng="${i}">🖼 PNG</button></div>
-      <div class="grid noprint" style="margin-top:8px"><div><label>Vista</label><select data-sf="cabOn"><option value="">🎯 Pixelmap</option><option value="1" ${s.cabOn==='1'?'selected':''}>🔌 Cablaggio</option></select></div>
+      <div class="grid noprint" style="margin-top:8px"><div><label>Vista</label><select data-sf="cabOn"><option value="">🎯 Pixelmap</option><option value="1" ${s.cabOn==='1'?'selected':''}>🔌 Cablaggio dati</option><option value="2" ${s.cabOn==='2'?'selected':''}>⚡ Corrente</option></select></div>
+      ${s.cabOn==='2'?(()=>{const pp=powPlan(c,s),w=+c.it.watt||0;if(!w)return `<div style="grid-column:1/-1" class="bad">Manca il consumo del modulo nell'inventario.</div>`;
+        return `<div><label>Partenza</label><select data-sf="cabStart">${[['BL','In basso a sinistra'],['BR','In basso a destra'],['TL','In alto a sinistra'],['TR','In alto a destra']].map(([v,l])=>`<option value="${v}" ${(s.cabStart||'BL')===v?'selected':''}>${l}</option>`).join('')}</select></div>
+        <div><label>Direzione</label><select data-sf="cabDir"><option value="col" ${(s.cabDir||'col')==='col'?'selected':''}>Per colonne ↕</option><option value="row" ${s.cabDir==='row'?'selected':''}>Per file ↔</option></select></div>
+        <div style="grid-column:1/-1"><p class="mut" style="margin:0 0 6px">Distributore: 32 A trifase, 6 prese da 16 A (2 per fase). Max ${pp.mpo} moduli per presa (16 A all'80%). Le fasi sono alternate per bilanciare il carico.</p>
+        ${[...Array(pp.dist)].map((_,d)=>`<div class="screen" style="margin:6px 0"><b>⚡ Distributore ${d+1}</b> <span class="mut">· L1 ${(pp.fasi[d][0]/230).toFixed(1)} A · L2 ${(pp.fasi[d][1]/230).toFixed(1)} A · L3 ${(pp.fasi[d][2]/230).toFixed(1)} A</span>
+          ${pp.info.filter(x=>x.d===d+1).sort((a,b)=>a.ph-b.ph||a.pr-b.pr).map(x=>`<div class="task" style="padding:6px 0"><span class="dav" style="background:${FASE_COL[x.ph-1]};margin:0;color:#000">L${x.ph}</span><div style="flex:1">Presa ${x.pr} · <b>${x.n} moduli</b></div><span class="mut">${(x.w/1000).toFixed(2)} kW · ${(x.w/230).toFixed(1)} A</span></div>`).join('')}</div>`).join('')}</div>`})():''}
       ${s.cabOn==='1'?(()=>{const cp=cabPlan(c,s);return `<div><label>Modo</label><select data-sf="cabMode"><option value="">Automatico</option><option value="man" ${s.cabMode==='man'?'selected':''}>✋ A mano</option></select></div>
       ${s.cabMode==='man'?`<div style="grid-column:1/-1"><div class="row" style="gap:6px">${((s.cabMan&&s.cabMan.ports)||[[]]).map((ch,p)=>`<button class="btn sm ${(CABPORT[i]||0)===p?'':'sec'}" data-cabport="${i}:${p}" style="${(CABPORT[i]||0)===p?`background:${CAB_COL[p%CAB_COL.length]};color:#000`:''}">P${p+1} · ${ch.length}</button>`).join('')}<button class="btn sec sm" data-cabadd="${i}">＋ Porta</button><span class="sp"></span><button class="btn sec sm" data-cabundo="${i}">↩︎ Annulla</button><button class="btn sec sm" data-cabclr="${i}">Svuota porta</button><button class="btn sec sm" data-cabcopy="${i}">Parti dall'automatico</button><button class="btn bad sm" data-caball="${i}">Svuota tutto</button></div>
       <p class="mut" style="margin:6px 0 0">Scegli la porta e passa col mouse (tieni premuto) o col dito sui moduli nell'ordine dei cavi. Tocca di nuovo un modulo per toglierlo.</p></div>`:''}
@@ -539,7 +547,7 @@ function vEvent(id){
     } else h+=`<p class="bad">Aggiungi prima un tipo di cassa LED nell'inventario.</p>`;
     h+='</div>';
   });
-  {const W=(ev.screens||[]).map(screenCalc).filter(Boolean).reduce((a,c)=>a+c.watt,0);if(W&&(ev.screens||[]).length>1)h+=`<div class="kpi"><div><b>${(W/1000).toFixed(1)} kW</b><span>consumo max di tutti gli schermi · ~${Math.ceil(W/(Math.sqrt(3)*400))} A per fase in trifase · ${psa(W)} Botex PSA 321</span></div></div>`}
+  {const W=(ev.screens||[]).map(screenCalc).filter(Boolean).reduce((a,c)=>a+c.watt,0);if(W&&(ev.screens||[]).length>1)h+=`<div class="kpi"><div><b>${(W/1000).toFixed(1)} kW</b><span>consumo max di tutti gli schermi · ~${Math.ceil(W/(Math.sqrt(3)*400))} A per fase in trifase · ${psa(W)} distributor${psa(W)>1?'i':'e'}</span></div></div>`}
   h+=`</div>`;
 
   // materiale
@@ -684,12 +692,12 @@ function pmDraw(g,c,t,scr){
   // un solo colore per schermo (tinta diversa per ogni schermo dell'evento), due tonalità a scacchiera sulle parti di ogni modulo
   const q=Math.min(mw,mh)/2, nx=Math.max(1,Math.round(mw/q)), ny=Math.max(1,Math.round(mh/q)), qw=mw/nx, qh=mh/ny;
   const hue=[350,180,110,285,30,210,320,55][(scr._i||0)%8], C1=`hsl(${hue},55%,62%)`, C2=`hsl(${hue},58%,40%)`;
-  const fw=Math.max(2,Math.round(Math.min(mw,mh)*.03)), cab=scr.cabOn==='1'?cabPlan(c,scr):null;
+  const fw=Math.max(2,Math.round(Math.min(mw,mh)*.03)), cab=scr.cabOn==='1'?cabPlan(c,scr):scr.cabOn==='2'?powPlan(c,scr):null;
   for(let r=0;r<c.rows;r++)for(let k=0;k<c.cols;k++){const n=r*c.cols+k, x0=k*mw, y0=r*mh, cp=cab&&cab.pos[k+','+r];
     for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){g.fillStyle=((k*nx+i)+(r*ny+j))%2?C2:C1;g.fillRect(x0+i*qw,y0+j*qh,qw+.5,qh+.5)}
     g.strokeStyle=`hsl(${hue},45%,18%)`;g.lineWidth=fw;g.strokeRect(x0+fw/2,y0+fw/2,mw-fw,mh-fw);
     // numero del modulo, al centro
-    const fs=Math.max(9,Math.round(qw*.36)), lab=cp?`P${cp.p} · ${cp.idx}`:`${n+1}`, pos=`C${k+1} · F${r+1}`, mx=x0+mw/2, my=cp?y0+mh*.24:y0+mh/2;
+    const fs=Math.max(9,Math.round(qw*.36)), lab=cp?(cp.lab||`P${cp.p} · ${cp.idx}`):`${n+1}`, pos=cp&&cp.sub?cp.sub:`C${k+1} · F${r+1}`, mx=x0+mw/2, my=cp?y0+mh*.24:y0+mh/2;
     g.textAlign='center';g.textBaseline='middle';
     g.font=`600 ${Math.round(fs*.6)}px -apple-system,system-ui,sans-serif`;const pw=g.measureText(pos).width;
     g.font=`800 ${fs}px -apple-system,system-ui,sans-serif`;const bw=Math.max(g.measureText(lab).width,pw)+fs*.8, bh=fs*2;
@@ -717,11 +725,23 @@ function pmDraw(g,c,t,scr){
   g.font=`700 ${sm}px -apple-system,system-ui,sans-serif`;g.fillText(l2,cx,cy-bh/2+big*1.35+sm*.7);g.fillStyle='rgba(255,255,255,.8)';g.fillText(l3,cx,cy-bh/2+big*1.35+sm*1.95);
   g.restore();
 }
+const FASE_COL=['#ff9f0a','#bf5af2','#64d2ff'];
+// corrente: moduli divisi sulle prese da 16 A del distributore (6 prese, 2 per fase), alternando le fasi per bilanciare
+function powPlan(c,s){
+  const order=cabPlan(c,{...s,cabMode:''}).order, w=+c.it.watt||0, N=order.length;
+  const mpo=w?Math.max(1,Math.floor(16*230*.8/w)):20;
+  const T=Math.max(1,Math.ceil(N/mpo)), base=Math.floor(N/T), extra=N%T, PRESE=[[1,1],[2,1],[3,1],[1,2],[2,2],[3,2]];
+  const chains=[],info=[];let at=0;
+  for(let j=0;j<T;j++){const n=base+(j<extra?1:0);chains.push(order.slice(at,at+n));at+=n;const [ph,pr]=PRESE[j%6];info.push({d:Math.floor(j/6)+1,ph,pr,n,w:n*w})}
+  const pos={};chains.forEach((ch,j)=>ch.forEach(([k,r],i)=>pos[k+','+r]={lab:`D${info[j].d} · L${info[j].ph}`,sub:`presa ${info[j].pr} · ${i+1}`}));
+  const dist=Math.ceil(T/6), fasi=[...Array(dist)].map((_,d)=>[1,2,3].map(ph=>info.filter(x=>x.d===d+1&&x.ph===ph).reduce((a,x)=>a+x.w,0)));
+  return {power:true,chains,info,pos,mpo,dist,fasi,ports:chains.length,col:j=>FASE_COL[info[j].ph-1],tag:j=>`${info[j].d}·L${info[j].ph}`};
+}
 function pmCab(g,c,t,scr,cab){
   const W=c.pxW,H=c.pxH,mw=c.it.pxW,mh=c.it.pxH,lw=Math.max(3,Math.round(Math.min(mw,mh)/22));
   const cen=([k,r])=>[k*mw+mw/2,r*mh+mh/2];
   if(scr.cabMode==='man')for(let r=0;r<c.rows;r++)for(let k=0;k<c.cols;k++)if(!cab.pos[k+','+r]){g.fillStyle='rgba(0,0,0,.55)';g.fillRect(k*mw,r*mh,mw,mh)}
-  for(let p=0;p<cab.ports;p++){const pts=cab.chains[p].map(cen), col=CAB_COL[p%CAB_COL.length];if(!pts.length)continue;
+  for(let p=0;p<cab.ports;p++){const pts=cab.chains[p].map(cen), col=cab.col?cab.col(p):CAB_COL[p%CAB_COL.length];if(!pts.length)continue;
     g.lineCap='round';g.lineJoin='round';
     g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=lw*1.9;g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.stroke();
     g.strokeStyle=col;g.lineWidth=lw;g.beginPath();pts.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.stroke();
@@ -732,8 +752,8 @@ function pmCab(g,c,t,scr,cab){
     for(let i=1;i<pts.length;i++){const [x1,y1]=pts[i-1],[x2,y2]=pts[i],a=Math.atan2(y2-y1,x2-x1),mx=(x1+x2)/2,my=(y1+y2)/2,z=lw*1.6;
       g.fillStyle=col;g.beginPath();g.moveTo(mx+Math.cos(a)*z,my+Math.sin(a)*z);g.lineTo(mx+Math.cos(a+2.5)*z,my+Math.sin(a+2.5)*z);g.lineTo(mx+Math.cos(a-2.5)*z,my+Math.sin(a-2.5)*z);g.closePath();g.fill()}
     // ingresso della porta
-    const [sx,sy]=pts[0],rr=lw*2.6;g.fillStyle=col;g.beginPath();g.arc(sx,sy,rr,0,Math.PI*2);g.fill();g.strokeStyle='#000';g.lineWidth=lw*.4;g.stroke();
-    g.fillStyle='#000';g.font=`900 ${Math.round(rr*1.05)}px -apple-system,system-ui,sans-serif`;g.textAlign='center';g.textBaseline='middle';g.fillText('P'+(p+1),sx,sy+rr*.05);}
+    const [sx,sy]=pts[0],rr=lw*(cab.tag?3.4:2.6);g.fillStyle=col;g.beginPath();g.arc(sx,sy,rr,0,Math.PI*2);g.fill();g.strokeStyle='#000';g.lineWidth=lw*.4;g.stroke();
+    g.fillStyle='#000';g.font=`900 ${Math.round(rr*1.05)}px -apple-system,system-ui,sans-serif`;g.textAlign='center';g.textBaseline='middle';g.fillText(cab.tag?cab.tag(p):'P'+(p+1),sx,sy+rr*.05);}
   const ow=Math.max(3,lw*.7);g.strokeStyle='#fff';g.lineWidth=ow;g.strokeRect(ow/2,ow/2,W-ow,H-ow);
 }
 function pmScreen(i){const ev=curEv&&DB.events.find(x=>x.id===curEv);const s0=ev&&ev.screens[+i];const c=s0&&screenCalc(s0);return c&&c.pxW&&c.pxH?{s:{...s0,_i:+i},c,ev}:null}
@@ -789,6 +809,10 @@ document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest
   else if(d.cabcopy){const c=screenCalc(o.s);const cp=cabPlan(c,{...o.s,cabMode:''});M.ports=cp.chains.map(ch=>ch.map(x=>[...x]));CABPORT[i]=0;cabSave(o,'cablaggio a mano copiato dall\'automatico')}
   else if(d.caball){M.ports=[[]];CABPORT[i]=0;cabSave(o,'cablaggio a mano svuotato')}
   render()});
+
+document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('[data-scropen],[data-scrclose]');if(!a)return;
+  window.SCROPEN=a.dataset.scrclose?-1:+a.dataset.scropen;render();
+  if(a.dataset.scropen!==undefined)setTimeout(()=>{const el=document.querySelector(`[data-scr="${window.SCROPEN}"]`);el&&el.scrollIntoView({behavior:'smooth',block:'start'})},0)});
 /* ---------- Home ---------- */
 function vHome(){
   const adm=isAdmin(), oggi=oggiS(), me=first(myName());
@@ -933,8 +957,8 @@ function bind(){
       back(){curEv=null;view='eventi';rememberUI();render();return 'nosave'},
       async delEv(){if(await ask('Eliminare l\'evento?')){logChange(`Eliminato evento "${ev.name}"`);DB.events=DB.events.filter(x=>x.id!==curEv);curEv=null}else return 'nosave'},
       dupEv(){const c=JSON.parse(JSON.stringify(ev));c.id=uid();c.name+=' (copia)';c.checked={};stamp(c);DB.events.push(c);curEv=c.id;logChange(`Duplicato evento "${ev.name}"`)},
-      addScreen(){const l=DB.items.find(i=>i.cat==='led');ev.screens.push({name:'Schermo '+(ev.screens.length+1),ledId:l?.id,mode:'moduli',w:3,h:2});stamp(ev);logChange(`Evento "${ev.name}": aggiunto schermo`)},
-      delScreen(){const sc=ev.screens[+a.dataset.i];ev.screens.splice(+a.dataset.i,1);stamp(ev);logChange(`Evento "${ev.name}": rimosso ${sc&&sc.name}`)},
+      addScreen(){const l=DB.items.find(i=>i.cat==='led');ev.screens.unshift({name:'Schermo '+(ev.screens.length+1),ledId:l?.id,mode:'moduli',w:3,h:2});window.SCROPEN=0;stamp(ev);logChange(`Evento "${ev.name}": aggiunto schermo`)},
+      delScreen(){const sc=ev.screens[+a.dataset.i];ev.screens.splice(+a.dataset.i,1);window.SCROPEN=-1;stamp(ev);logChange(`Evento "${ev.name}": rimosso ${sc&&sc.name}`)},
       addExtra(){ev.extras=ev.extras||[];const x={itemId:document.getElementById('extraSel').value,qty:+document.getElementById('extraQty').value||1};ev.extras.push(x);stamp(ev);logChange(`Evento "${ev.name}": aggiunto a mano ${x.qty} × ${item(x.itemId)?.name}`)},
       delExtra(){const x=ev.extras[+a.dataset.i];ev.extras.splice(+a.dataset.i,1);stamp(ev);logChange(`Evento "${ev.name}": tolto ${x&&item(x.itemId)?.name}`)},
       async export(){const data=JSON.stringify(DB,null,2), filename='backup-gestionale-'+new Date().toISOString().slice(0,10)+'.json';
