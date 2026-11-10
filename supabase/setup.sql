@@ -15,3 +15,6 @@ create policy "solo_proprietario" on public.stato
 -- create table public.blocchi (id bigint generated always as identity primary key, user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
 --   nome text not null, dal date not null, al date not null, nota text default '', created_at timestamptz default now(), check (al >= dal));
 -- RLS: select tutti gli autenticati; insert con user_id = auth.uid(); delete se proprio o app_metadata.ruolo = 'admin'. Tabella in supabase_realtime.
+
+-- Task e to-do list (10 nov 2026): tabella public.attivita (tipo task|lista, comune true/false, voci jsonb).
+-- RLS: vedi comuni o tue; crea le tue; modifica comuni o tue; elimina tue (o admin sulle comuni). Trigger attivita_guard.

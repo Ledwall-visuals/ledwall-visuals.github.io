@@ -42,6 +42,10 @@ Deno.serve(async (req) => {
   if (!tok || t !== tok.token) return new Response("Non autorizzato", { status: 401 });
   const { data: row } = await sb.from("condiviso").select("data").eq("id", "main").maybeSingle();
   const DB = (row?.data || {}) as any;
+  // task e to-do list: solo quelle comuni (il link del feed è condiviso nel team)
+  const { data: att } = await sb.from("attivita").select("*").eq("comune", true).order("created_at");
+  DB.tasks = (att || []).filter((x: any) => x.tipo === "task");
+  DB.checklists = (att || []).filter((x: any) => x.tipo === "lista").map((x: any) => ({ nome: x.testo, voci: x.voci || [] }));
   const T: Turni | null = DB.turni || null;
   const { data: bl } = await sb.from("blocchi").select("nome,dal,al").gte("al", new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10));
   BLOCCHI = (bl || []) as Blocco[];

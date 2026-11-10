@@ -232,7 +232,7 @@ let pubTimer=null, dirty=false, USER=null;
 let ANTEPRIMA=false; try{ANTEPRIMA=sessionStorage.getItem(KEY+'-ante')==='1'}catch(e){}
 function realAdmin(){return !!(USER&&USER.app_metadata&&USER.app_metadata.ruolo==='admin')}
 function isAdmin(){return realAdmin()&&!ANTEPRIMA}
-const VISTE_UTENTE=['calendario','inventario','assenze','backup'];
+const VISTE_UTENTE=['calendario','task','inventario','assenze','backup'];
 function setSt(t){const e=document.getElementById('saveSt');if(e)e.textContent=t}
 function save(){
   if(USER&&!isAdmin()){toast('Sola lettura');return}
@@ -309,6 +309,7 @@ function startRealtime(){
     if(r.user_id!==USER.id)toast(`${r.nome}: ${r.testo}`);
     if(view==='registro'&&!curEv)loadLog()});
   CH.on('postgres_changes',{event:'*',schema:'public',table:'blocchi'},()=>loadBlocchi());
+  CH.on('postgres_changes',{event:'*',schema:'public',table:'attivita'},()=>loadAtt());
   CH.subscribe(st=>{if(st==='SUBSCRIBED')track()});
   document.addEventListener('focusin',e=>{const k=keyOf(e.target);if(k!==MYFOCUS){MYFOCUS=k;track()}});
   document.addEventListener('focusout',()=>{setTimeout(()=>{const k=keyOf(document.activeElement);if(k!==MYFOCUS){MYFOCUS=k;track()}},50)});
@@ -339,7 +340,7 @@ async function start(){
   const {data:{session}}=await sb.auth.getSession();
   if(!session){showLogin();return}
   USER=session.user; try{const {data:rs}=await sb.auth.refreshSession();if(rs&&rs.user)USER=rs.user}catch(e){} document.getElementById('logout').style.display='';document.getElementById('pwbtn').style.display='';
-  await pull(); loadBlocchi(); startRealtime();
+  await pull(); loadBlocchi(); loadAtt(); startRealtime();
 }
 document.getElementById('loginForm').onsubmit=async e=>{e.preventDefault();
   if(!sb)return; document.getElementById('lErr').textContent='Accesso…';
@@ -415,7 +416,7 @@ document.getElementById('nav').onclick=e=>{const b=e.target.closest('[data-v]');
 function rememberUI(){try{sessionStorage.setItem(KEY+'-ui',JSON.stringify({view,curEv}))}catch(e){}}
 function render(){
   const adm=isAdmin(); if(!adm){curEv=null;if(!VISTE_UTENTE.includes(view))view='calendario'}
-  const TABS=adm?['calendario','eventi','turni','task','backup']:['calendario','inventario','assenze','backup'];
+  const TABS=adm?['calendario','eventi','turni','task','backup']:['calendario','task','inventario','assenze','backup'];
   const attivo=TABS.includes(view)?view:'backup';
   document.querySelectorAll('#nav button').forEach(b=>{b.classList.toggle('on',b.dataset.v===attivo);b.style.display=TABS.includes(b.dataset.v)?'':'none'});
   const pb=document.getElementById('pwbtn');if(pb&&USER)pb.textContent=initials(myName());
@@ -592,7 +593,7 @@ function vCal(){
   const cell=(d,extra)=>{const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const evs=isAdmin()?DB.events.filter(e=>e.start&&e.start<=ds&&ds<=(e.end||e.start)):[];
     const tu=isSunday(ds)?davDay(ds):'';
-    const tk=isAdmin()?(DB.tasks||[]).filter(x=>x.scadenza===ds&&!x.fatto).length:0;
+    const tk=taskAperti().filter(x=>x.scadenza===ds).length;
     return `<div class="calcell${ds===oggi?' today':''}${isSunday(ds)?' dom':''}"${extra?' style="opacity:.35"':''}><div><span class="cnum">${d.getDate()}</span>${extra&&d.getDate()===1?'<span class="mut"> '+d.toLocaleDateString('it-IT',{month:'short'})+'</span>':''}${tk?` <span title="${tk} task in scadenza" style="font-size:11px">✅${tk>1?tk:''}</span>`:''}</div>${tu}${evs.map(e=>`<div class="chip" data-open="${e.id}">${esc(e.name||'Evento')}</div>`).join('')}</div>`};
   let h=`<div class="card"><div class="row" style="margin-bottom:10px;flex-wrap:nowrap"><button class="btn sec sm" data-calm="-1" aria-label="Mese precedente">‹</button><h2 style="text-transform:capitalize;margin:0;flex:1;text-align:center">${base.toLocaleDateString('it-IT',{month:'long',year:'numeric'})}</h2>${CALOFF?'<button class="btn sec sm" data-calm="0">Oggi</button>':''}<button class="btn sec sm" data-calm="1" aria-label="Mese successivo">›</button></div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px">`;
   ['L','M','M','G','V','S','D'].forEach(x=>h+=`<div class="mut" style="text-align:center;font-size:11px;font-weight:600;letter-spacing:.06em">${x}</div>`);
@@ -660,32 +661,62 @@ function vHome(){
   const ev=adm?[...DB.events].filter(x=>(x.end||x.start||'')>=oggi&&x.start).sort((a,b)=>a.start.localeCompare(b.start))[0]:null;
   const evCard=adm?`<div class="card evbig"${ev?` data-open="${ev.id}"`:''}><div class="eyebrow">🎛️ Prossimo evento</div>${ev?`<div class="row" style="align-items:flex-end;flex-wrap:nowrap"><div style="flex:1;min-width:0"><div class="t">${esc(ev.name||'Evento')}</div><div class="mut" style="margin-top:4px">${fmtD(ev.start)}${ev.end&&ev.end!==ev.start?' → '+fmtD(ev.end):''}${ev.place?' · '+esc(ev.place):''}</div><div style="margin-top:10px"><span class="tag ${status(ev).cls}">${status(ev).txt}</span></div></div><div style="text-align:right">${giorni(ev.start)>0?`<div class="count">${giorni(ev.start)}</div><div class="mut">giorni</div>`:'<span class="pill me">In corso</span>'}</div></div>`:'<p class="mut" style="margin:0">Nessun evento in programma.</p><button class="link" data-act="addEv" style="margin-top:8px">+ Crea evento</button>'}</div>`:'';
   // task
-  const tasks=adm?(DB.tasks||[]).filter(x=>!x.fatto).sort((a,b)=>(a.scadenza||'9').localeCompare(b.scadenza||'9')):[];
-  const tkCard=adm?`<div class="card"><div class="eyebrow">✅ Task <span class="sp"></span><button class="link" data-gov="task">Tutti →</button></div>${tasks.slice(0,5).map(x=>`<div class="task"><input type="checkbox" data-tdone="${x.id}"><div style="flex:1;min-width:0"><div class="tt">${esc(x.testo)}</div>${x.chi||x.scadenza?`<div class="mut">${x.chi?esc(x.chi):''}${x.chi&&x.scadenza?' · ':''}${x.scadenza?`<span class="${x.scadenza<oggi?'bad':''}">${new Date(x.scadenza+'T12:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</span>`:''}</div>`:''}</div></div>`).join('')||'<p class="mut" style="margin:0">Niente da fare 🎉</p>'}${tasks.length>5?`<div class="mut" style="margin-top:8px">+ altri ${tasks.length-5}</div>`:''}</div>`:'';
+  const tasks=taskAperti();
+  const tkCard=`<div class="card"><div class="eyebrow">✅ Task <span class="sp"></span><button class="link" data-gov="task">Tutti →</button></div>${tasks.slice(0,5).map(x=>`<div class="task"><input type="checkbox" data-atdone="${x.id}"><div style="flex:1;min-width:0"><div class="tt">${x.comune?'':'🔒 '}${esc(x.testo)}</div>${x.chi||x.scadenza?`<div class="mut">${x.chi?esc(x.chi):''}${x.chi&&x.scadenza?' · ':''}${x.scadenza?`<span class="${x.scadenza<oggi?'bad':''}">${new Date(x.scadenza+'T12:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</span>`:''}</div>`:''}</div></div>`).join('')||'<p class="mut" style="margin:0">Niente da fare 🎉</p>'}${tasks.length>5?`<div class="mut" style="margin-top:8px">+ altri ${tasks.length-5}</div>`:''}</div>`;
   return `<div class="hello"><h2>${saluto}, ${esc(me)}</h2><p style="text-transform:capitalize">${dataLunga}</p></div>
   <div class="hgrid"><div class="wide">${vCal()}</div><div class="side">${hero}${evCard}${tkCard}</div></div>`;
 }
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-gov]');if(!b)return;view=b.dataset.gov;curEv=null;rememberUI();render();scrollTo(0,0)});
 /* ---------- Task e checklist ---------- */
+let ATT=[];
+async function loadAtt(){if(!USER||!sb)return;const {data,error}=await sb.from('attivita').select('*').order('created_at');if(error){console.error(error);return}
+  ATT=data||[];if(!curEv&&['calendario','task'].includes(view)&&!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#app')))render()}
+const taskAperti=()=>ATT.filter(x=>x.tipo==='task'&&!x.fatto).sort((a,b)=>(a.scadenza||'9').localeCompare(b.scadenza||'9'));
+const puoiEliminare=x=>USER&&(x.user_id===USER.id||(x.comune&&isAdmin()));
+const lucchetto=x=>x.comune?'':'<span class="pill" style="font-size:11px;padding:2px 8px">🔒 Solo tu</span> ';
 function vTask(){
-  DB.tasks=DB.tasks||[];DB.checklists=DB.checklists||[];
-  const T=turni(), chi=[...T.persone,T.jolly].filter(Boolean);
-  const todo=DB.tasks.filter(x=>!x.fatto).sort((a,b)=>(a.scadenza||'9').localeCompare(b.scadenza||'9')), fatti=DB.tasks.filter(x=>x.fatto);
-  const row=x=>`<div class="task${x.fatto?' fatto':''}"><input type="checkbox" data-tdone="${x.id}" ${x.fatto?'checked':''}><div style="flex:1"><div class="tt">${esc(x.testo)}</div><div class="mut">${x.chi?`<span class="dav" style="background:${pcol(x.chi)};width:18px;height:18px;font-size:8px;vertical-align:middle">${esc(initials(x.chi))}</span> ${esc(x.chi)} `:''}${x.scadenza?`· 📅 ${fmtD(x.scadenza)}${!x.fatto&&x.scadenza<new Date().toISOString().slice(0,10)?' <span class="bad">scaduto</span>':''}`:''}</div></div><button class="btn sec sm" data-act="delTask" data-id="${x.id}">✕</button></div>`;
+  const T=turni(), chi=[...T.persone,T.jolly].filter(Boolean), oggi=oggiS();
+  const tasks=ATT.filter(x=>x.tipo==='task'), liste=ATT.filter(x=>x.tipo==='lista');
+  const todo=taskAperti(), fatti=tasks.filter(x=>x.fatto);
+  const vis=id=>`<select id="${id}"><option value="1">👥 Tutti</option><option value="0">🔒 Solo io</option></select>`;
+  const row=x=>`<div class="task${x.fatto?' fatto':''}"><input type="checkbox" data-atdone="${x.id}" ${x.fatto?'checked':''}><div style="flex:1;min-width:0"><div class="tt">${esc(x.testo)}</div><div class="mut">${lucchetto(x)}${x.chi?`<span class="dav" style="background:${pcol(x.chi)};width:18px;height:18px;font-size:8px;vertical-align:middle">${esc(initials(x.chi))}</span> ${esc(x.chi)} `:''}${x.scadenza?`· 📅 ${fmtD(x.scadenza)}${!x.fatto&&x.scadenza<oggi?' <span class="bad">scaduto</span>':''}`:''}${x.autore&&x.comune?` <span style="opacity:.7">· creato da ${esc(first(x.autore))}</span>`:''}</div></div>${puoiEliminare(x)?`<button class="btn sec sm" data-atdel="${x.id}">✕</button>`:''}</div>`;
   let h=`<div class="card"><h2>✅ Task da fare</h2>
   <div class="grid"><div style="grid-column:span 2"><label>Cosa c'è da fare</label><input id="tTesto" placeholder="es. Comprare cavi Cat6"></div>
   <div><label>Chi</label><select id="tChi"><option value="">—</option>${chi.map(n=>`<option>${esc(n)}</option>`).join('')}</select></div>
   <div><label>Scadenza</label><input type="date" id="tData"></div>
-  <div style="align-self:end"><button class="btn" data-act="addTask">+ Aggiungi</button></div></div>
+  <div><label>Chi la vede</label>${vis('tVis')}</div>
+  <div style="align-self:end"><button class="btn" data-atadd="task">+ Aggiungi</button></div></div>
   ${todo.map(row).join('')||'<p class="mut">Nessun task aperto 🎉</p>'}
-  ${fatti.length?`<h3>Completati (${fatti.length})</h3>${fatti.slice(-10).reverse().map(row).join('')}<button class="btn sec sm" data-act="clearTask" style="margin-top:8px">Elimina completati</button>`:''}</div>`;
-  h+=`<div class="card"><div class="row"><h2 style="margin:0">📋 Checklist</h2><span class="sp"></span><input id="clNome" placeholder="Nome nuova checklist" style="max-width:220px"><button class="btn" data-act="addCl">+ Crea</button></div>
-  <p class="mut">Liste riutilizzabili, es. "Montaggio domenica" o "Carico furgone". Spunta le voci e alla fine premi "Azzera".</p>
-  ${DB.checklists.map(c=>{const n=c.voci.filter(v=>v.fatto).length;return `<div class="screen"><div class="row"><b style="flex:1">${esc(c.nome)}</b><span class="tag ${n===c.voci.length&&n?'ok':''}">${n}/${c.voci.length}</span><button class="btn sec sm" data-act="resetCl" data-id="${c.id}">Azzera</button><button class="btn bad sm" data-act="delCl" data-id="${c.id}">Elimina</button></div>
-    ${c.voci.map((v,i)=>`<div class="task${v.fatto?' fatto':''}"><input type="checkbox" data-cl="${c.id}:${i}" ${v.fatto?'checked':''}><div class="tt" style="flex:1">${esc(v.testo)}</div><button class="btn sec sm" data-act="delVoce" data-id="${c.id}" data-i="${i}">✕</button></div>`).join('')}
-    <div class="row" style="margin-top:8px"><input data-newvoce="${c.id}" placeholder="Nuova voce (Invio per aggiungere)"></div></div>`}).join('')||'<p class="mut">Nessuna checklist.</p>'}</div>`;
+  ${fatti.length?`<h3>Completati (${fatti.length})</h3>${fatti.slice(-10).reverse().map(row).join('')}${fatti.some(puoiEliminare)?'<button class="btn sec sm" data-atclear="1" style="margin-top:8px">Elimina completati</button>':''}`:''}</div>`;
+  h+=`<div class="card"><h2>📋 To-do list</h2>
+  <div class="grid"><div style="grid-column:span 2"><label>Nome della lista</label><input id="clNome" placeholder="es. Montaggio domenica"></div>
+  <div><label>Chi la vede</label>${vis('clVis')}</div>
+  <div style="align-self:end"><button class="btn" data-atadd="lista">+ Crea</button></div></div>
+  <p class="mut">Liste riutilizzabili: spunta le voci e alla fine premi "Azzera".</p>
+  ${liste.map(c=>{const v=c.voci||[], n=v.filter(q=>q.fatto).length;return `<div class="screen"><div class="row"><b style="flex:1">${esc(c.testo)}</b>${lucchetto(c)}<span class="tag ${n===v.length&&n?'ok':''}">${n}/${v.length}</span><button class="btn sec sm" data-atreset="${c.id}">Azzera</button>${puoiEliminare(c)?`<button class="btn bad sm" data-atdel="${c.id}">Elimina</button>`:''}</div>
+    ${v.map((q,i)=>`<div class="task${q.fatto?' fatto':''}"><input type="checkbox" data-atvoce="${c.id}:${i}" ${q.fatto?'checked':''}><div class="tt" style="flex:1">${esc(q.testo)}</div><button class="btn sec sm" data-atvdel="${c.id}:${i}">✕</button></div>`).join('')}
+    <div class="row" style="margin-top:8px"><input data-atnew="${c.id}" placeholder="Nuova voce (Invio per aggiungere)"></div></div>`}).join('')||'<p class="mut">Nessuna lista.</p>'}</div>`;
   return h;
 }
+async function attDo(q,ok){const {error}=await q;if(error){toast('Errore: '+error.message);return false}if(ok)toast(ok);await loadAtt();render();return true}
+const attById=id=>ATT.find(x=>x.id===id);
+document.addEventListener('click',async e=>{
+  const a=e.target.closest&&e.target.closest('[data-atadd],[data-atdel],[data-atclear],[data-atreset],[data-atvdel]');if(!a||!USER)return;
+  if(a.dataset.atadd==='task'){const testo=document.getElementById('tTesto').value.trim();if(!testo){toast('Scrivi cosa c\'è da fare');return}
+    return attDo(sb.from('attivita').insert({tipo:'task',testo,chi:document.getElementById('tChi').value||null,scadenza:document.getElementById('tData').value||null,comune:document.getElementById('tVis').value==='1',autore:first(myName())}),'Task aggiunto ✓')}
+  if(a.dataset.atadd==='lista'){const testo=document.getElementById('clNome').value.trim();if(!testo){toast('Dai un nome alla lista');return}
+    return attDo(sb.from('attivita').insert({tipo:'lista',testo,comune:document.getElementById('clVis').value==='1',autore:first(myName())}),'Lista creata ✓')}
+  if(a.dataset.atdel){const x=attById(a.dataset.atdel);if(!x)return;if(!await ask(`Eliminare "${x.testo}"?`))return;return attDo(sb.from('attivita').delete().eq('id',x.id),'Eliminato')}
+  if(a.dataset.atclear){const ids=ATT.filter(x=>x.tipo==='task'&&x.fatto&&puoiEliminare(x)).map(x=>x.id);if(!ids.length)return;return attDo(sb.from('attivita').delete().in('id',ids),'Completati eliminati')}
+  if(a.dataset.atreset){const c=attById(a.dataset.atreset);return attDo(sb.from('attivita').update({voci:(c.voci||[]).map(v=>({...v,fatto:false}))}).eq('id',c.id))}
+  if(a.dataset.atvdel){const [id,i]=a.dataset.atvdel.split(':');const c=attById(id);const v=[...(c.voci||[])];v.splice(+i,1);return attDo(sb.from('attivita').update({voci:v}).eq('id',id))}
+});
+document.addEventListener('change',async e=>{const t=e.target;if(!USER||!t.dataset)return;
+  if(t.dataset.atdone){const x=attById(t.dataset.atdone);x.fatto=t.checked;return attDo(sb.from('attivita').update({fatto:t.checked}).eq('id',x.id))}
+  if(t.dataset.atvoce){const [id,i]=t.dataset.atvoce.split(':');const c=attById(id);const v=(c.voci||[]).map(q=>({...q}));v[+i].fatto=t.checked;return attDo(sb.from('attivita').update({voci:v}).eq('id',id))}
+  if(t.dataset.atnew){const testo=t.value.trim();if(!testo)return;const id=t.dataset.atnew;const c=attById(id);
+    if(await attDo(sb.from('attivita').update({voci:[...(c.voci||[]),{testo,fatto:false}]}).eq('id',id)))setTimeout(()=>{const n=document.querySelector(`[data-atnew="${id}"]`);n&&n.focus()},0)}
+});
 
 /* ---------- Widget iPhone ---------- */
 const FEED_BASE='https://rliekssnvssbpkjzpash.supabase.co/functions/v1/feed';
@@ -759,13 +790,6 @@ function bind(){
         if(dl){try{await dl.save({filename,data});toast('Backup salvato')}catch(_){toast('Download annullato')}}
         else{const b=new Blob([data],{type:'application/json'});const u=document.createElement('a');u.href=URL.createObjectURL(b);u.download=filename;u.click()}
         return 'nosave'},
-      addTask(){const testo=document.getElementById('tTesto').value.trim();if(!testo)return 'nosave';DB.tasks=DB.tasks||[];const x={id:uid(),testo,chi:document.getElementById('tChi').value,scadenza:document.getElementById('tData').value,fatto:false};stamp(x);DB.tasks.push(x);logChange(`Nuovo task: "${testo}"${x.chi?' per '+x.chi:''}`)},
-      delTask(){const x=DB.tasks.find(t=>t.id===a.dataset.id);DB.tasks=DB.tasks.filter(t=>t.id!==a.dataset.id);logChange(`Eliminato task "${x&&x.testo}"`)},
-      clearTask(){const n=DB.tasks.filter(t=>t.fatto).length;DB.tasks=DB.tasks.filter(t=>!t.fatto);logChange(`Eliminati ${n} task completati`)},
-      addCl(){const nome=document.getElementById('clNome').value.trim();if(!nome)return 'nosave';DB.checklists=DB.checklists||[];DB.checklists.push({id:uid(),nome,voci:[]});logChange(`Nuova checklist "${nome}"`)},
-      async delCl(){const c=DB.checklists.find(x=>x.id===a.dataset.id);if(!await ask(`Eliminare la checklist "${c.nome}"?`))return 'nosave';DB.checklists=DB.checklists.filter(x=>x.id!==c.id);logChange(`Eliminata checklist "${c.nome}"`)},
-      resetCl(){const c=DB.checklists.find(x=>x.id===a.dataset.id);c.voci.forEach(v=>v.fatto=false);logChange(`Checklist "${c.nome}": azzerate le spunte`)},
-      delVoce(){const c=DB.checklists.find(x=>x.id===a.dataset.id);const v=c.voci.splice(+a.dataset.i,1)[0];logChange(`Checklist "${c.nome}": tolta voce "${v&&v.testo}"`)},
       copyIcs(){copia(FEED_BASE+'?t='+FEEDTOK+(isAdmin()?'':'&solo=turni')+(isMe(turni().jolly)?'':'&p='+encodeURIComponent(first(myName()))),'Link calendario copiato');return 'nosave'},
       copyScript(){copia(scriptable(),'Script copiato: ora aprilo in Scriptable');return 'nosave'},
       moreTurni(){window.TMORE=true;render();return 'nosave'},
@@ -777,9 +801,6 @@ function bind(){
   app.onchange=e=>{
     const t=e.target, ev=curEv&&DB.events.find(x=>x.id===curEv);
     if(t.id==='logq'){window.LOGQUERY=t.value;render();return}
-    if(t.dataset.tdone){const x=DB.tasks.find(q=>q.id===t.dataset.tdone);x.fatto=t.checked;stamp(x);logChange(`Task "${x.testo}": ${t.checked?'completato ✓':'riaperto'}`);save();render();return}
-    if(t.dataset.cl){const [cid,i]=t.dataset.cl.split(':');const c=DB.checklists.find(x=>x.id===cid);c.voci[+i].fatto=t.checked;logChange(`Checklist "${c.nome}": ${t.checked?'✓':'✗'} ${c.voci[+i].testo}`);save();render();return}
-    if(t.dataset.newvoce){const v=t.value.trim();if(!v)return;const c=DB.checklists.find(x=>x.id===t.dataset.newvoce);c.voci.push({testo:v,fatto:false});logChange(`Checklist "${c.nome}": aggiunta voce "${v}"`);save();render();setTimeout(()=>{const n=document.querySelector(`[data-newvoce="${c.id}"]`);n&&n.focus()},0);return}
     if(t.dataset.turno){const T=turni();const [ds,sl]=t.dataset.turno.split(':');const k=ds+':'+sl;const old=turno(ds,+sl);
       if(t.value==='__auto')delete T.override[k];else T.override[k]=t.value;
       logChange(`Turno ${T.slot[+sl]} di ${fmtD(ds)}: ${old||'nessuno'} → ${turno(ds,+sl)||'nessuno'}`);save();render();return}
