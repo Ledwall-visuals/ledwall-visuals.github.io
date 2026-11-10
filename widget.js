@@ -52,19 +52,26 @@ function intervallo(l) {
   return [a, b];
 }
 // barra dei turni di lavoro su una settimana: una riga continua da lunedì all'ora di inizio fino all'ora di fine
-function barreSettimana(lunedi, larg, alt, cw, gap, dimDa) {
+function barreSettimana(lunedi, larg, alt, cw, gap) {
   const c = new DrawContext(); c.size = new Size(larg, alt); c.opaque = false; c.respectScreenScale = true;
   const t0 = new Date(lunedi); t0.setHours(0, 0, 0, 0); const t1 = new Date(t0); t1.setDate(t1.getDate() + 7);
   const xOf = dt => { const g = (dt - t0) / 864e5; const di = Math.min(6, Math.max(0, Math.floor(g))); return Math.min(larg, Math.max(0, di * (cw + gap) + (g - di) * cw)); };
+  // mese corrente: la parte di barra fuori dal mese è trasparente, come i giorni del calendario
+  const ora = new Date(), m0 = new Date(ora.getFullYear(), ora.getMonth(), 1), m1 = new Date(ora.getFullYear(), ora.getMonth() + 1, 1);
+  const xm0 = m0 <= t0 ? 0 : m0 >= t1 ? larg : xOf(m0), xm1 = m1 >= t1 ? larg : m1 <= t0 ? 0 : xOf(m1);
   let n = 0;
   lavoro.forEach(l => {
     const [a, b] = intervallo(l); if (b <= t0 || a >= t1) return;
     const x0 = xOf(a < t0 ? t0 : a), x1 = xOf(b > t1 ? t1 : b); if (x1 - x0 < 3) return; n++;
-    // barra sottile al centro della riga: parte e finisce all'ora del turno, titolo in maiuscolo al centro
-    const col = l.col ? l.col.hex : "ff9f0a", fuori = dimDa && a >= dimDa, y = Math.round(alt / 2 - 5), hb = 18; // stessa altezza di partenza, più alta solo verso il basso
-    const p = new Path(); p.addRoundedRect(new Rect(x0, y, x1 - x0, hb), 4, 4);
-    c.addPath(p); c.setFillColor(new Color(col, fuori ? 0.35 : 0.9)); c.fillPath();
-    if (x1 - x0 > 24) { c.setFont(Font.heavySystemFont(8)); c.setTextColor(new Color("#ffffff", fuori ? 0.6 : 1)); c.setTextAlignedCenter(); c.drawTextInRect((l.cal || "Lavoro").toUpperCase(), new Rect(x0, y + 4, x1 - x0, hb)); }
+    // barra al centro della riga: parte e finisce all'ora del turno, titolo in maiuscolo al centro
+    const col = l.col ? l.col.hex : "ff9f0a", y = Math.round(alt / 2 - 5), hb = 18;
+    const bar = (xa, xb, al) => { const p = new Path(); p.addRoundedRect(new Rect(xa, y, xb - xa, hb), 4, 4); c.addPath(p); c.setFillColor(new Color(col, al)); c.fillPath(); };
+    const ia = Math.max(x0, xm0), ib = Math.min(x1, xm1), dentro = ib - ia > 1;
+    // parte fuori dal mese: trasparente; parte nel mese: piena (gli angoli restano dritti sul confine del mese)
+    if (!dentro || ia > x0 || ib < x1) bar(x0, x1, 0.3);
+    if (dentro) { bar(ia, ib, 0.9); c.setFillColor(new Color(col, 0.9)); if (ia > x0) c.fillRect(new Rect(ia, y, 4, hb)); if (ib < x1) c.fillRect(new Rect(ib - 4, y, 4, hb)); }
+    const ta = dentro ? ia : x0, tb = dentro ? ib : x1;
+    if (tb - ta > 24) { c.setFont(Font.heavySystemFont(8)); c.setTextColor(new Color("#ffffff", dentro ? 1 : 0.55)); c.setTextAlignedCenter(); c.drawTextInRect((l.cal || "Lavoro").toUpperCase(), new Rect(ta, y + 4, tb - ta, hb)); }
   });
   return n ? c.getImage() : null;
 }
@@ -148,7 +155,7 @@ if (mode.toLowerCase().startsWith("task")) {
   w.addSpacer(2);
   for (let r = 0; r < rows; r++) {
     const row = w.addStack(); row.spacing = 2;
-    if (days[r * 7]) { const dimDa = days.slice(r * 7, r * 7 + 7).find(x => x && x.extra); const img = barreSettimana(days[r * 7].dt, 7 * cw + 12, ch, cw, 2, dimDa ? new Date(ds(dimDa.dt) + "T00:00") : null); if (img) row.backgroundImage = img; }
+    if (days[r * 7]) { const img = barreSettimana(days[r * 7].dt, 7 * cw + 12, ch, cw, 2); if (img) row.backgroundImage = img; }
     for (let i = 0; i < 7; i++) {
       const it = days[r * 7 + i]; const cell = row.addStack(); cell.size = new Size(cw, ch); cell.layoutVertically(); cell.cornerRadius = 6;
       if (!it || it.blank) continue;
