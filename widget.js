@@ -60,13 +60,11 @@ function barreSettimana(lunedi, larg, alt, cw, gap, dimDa) {
   lavoro.forEach(l => {
     const [a, b] = intervallo(l); if (b <= t0 || a >= t1) return;
     const x0 = xOf(a < t0 ? t0 : a), x1 = xOf(b > t1 ? t1 : b); if (x1 - x0 < 3) return; n++;
-    // blocco colorato alto quanto la riga: parte e finisce all'ora del turno
-    const col = l.col ? l.col.hex : "ff9f0a", fuori = dimDa && a >= dimDa;
-    const p = new Path(); p.addRoundedRect(new Rect(x0, 0, x1 - x0, alt), 7, 7);
-    c.addPath(p); c.setFillColor(new Color(col, fuori ? 0.18 : 0.42)); c.fillPath();
-    const pb = new Path(); pb.addRoundedRect(new Rect(x0, 0, x1 - x0, alt), 7, 7); c.addPath(pb); c.setStrokeColor(new Color(col, fuori ? 0.4 : 0.95)); c.setLineWidth(1.5); c.strokePath();
-    const lab = (l.cal || "Lavoro") + "  " + orario(l);
-    if (x1 - x0 > 26) { c.setFont(Font.boldSystemFont(8)); c.setTextColor(new Color("#ffffff", fuori ? 0.6 : 1)); c.drawTextInRect(x1 - x0 > 75 ? lab : (l.cal || "Lavoro"), new Rect(x0 + 5, alt - 13, x1 - x0 - 8, 11)); }
+    // barra sottile al centro della riga: parte e finisce all'ora del turno, titolo in maiuscolo al centro
+    const col = l.col ? l.col.hex : "ff9f0a", fuori = dimDa && a >= dimDa, hb = 14, y = Math.round(alt / 2 - hb / 2 + 2);
+    const p = new Path(); p.addRoundedRect(new Rect(x0, y, x1 - x0, hb), hb / 2, hb / 2);
+    c.addPath(p); c.setFillColor(new Color(col, fuori ? 0.35 : 0.9)); c.fillPath();
+    if (x1 - x0 > 24) { c.setFont(Font.heavySystemFont(8)); c.setTextColor(new Color("#ffffff", fuori ? 0.6 : 1)); c.setTextAlignedCenter(); c.drawTextInRect((l.cal || "Lavoro").toUpperCase(), new Rect(x0, y + 2, x1 - x0, hb)); }
   });
   return n ? c.getImage() : null;
 }
