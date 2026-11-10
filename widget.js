@@ -9,7 +9,9 @@ try { d = await new Request(FEED).loadJSON(); fm.writeString(cache, JSON.stringi
 catch (e) { d = fm.fileExists(cache) ? JSON.parse(fm.readString(cache)) : { persone: [], turni: [], eventi: [], task: [], checklist: [], oggi: new Date().toISOString().slice(0, 10) }; }
 
 const fam = config.widgetFamily || "large";
-const mode = String(args.widgetParameter || "calendario").split(";")[0].trim() || "calendario";
+const PARAM = String(args.widgetParameter || "").split(";")[0].trim();
+// MODO fisso nello script (es. "task" o "todo"); per la to-do il parametro del widget può essere il nome della lista
+const mode = (typeof MODO !== "undefined" && MODO) ? (MODO === "todo" && PARAM && !/^todo/i.test(PARAM) ? "todo:" + PARAM : MODO) : (PARAM || "calendario");
 const BG = new Color("#0f1115"), CELL = new Color("#1b1f27"), TX = new Color("#e8eaef"), MUT = new Color("#7d8491"), ACC = new Color("#4f8cff"), OK = new Color("#2fbf71");
 const pers = {}; (d.persone || []).forEach(p => pers[p.nome] = p);
 const first = n => String(n || "").trim().split(/\s+/)[0];
