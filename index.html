@@ -522,7 +522,7 @@ function vEvent(id){
       <div><b>${c.mW.toFixed(2)} × ${c.mH.toFixed(2)} m</b><span>misura reale</span></div>
       <div><b>${c.pxW} × ${c.pxH}</b><span>risoluzione px (${(c.pxW*c.pxH/1e6).toFixed(2)} MP)</span></div>
       <div><b>${c.kg.toFixed(0)} kg</b><span>peso moduli</span></div>
-      <div><b>${(c.watt/1000).toFixed(1)} kW</b><span>consumo max (~${Math.ceil(c.watt/230)} A a 230V)</span></div></div>`;
+      <div><b>${(c.watt/1000).toFixed(1)} kW</b><span>consumo max · ~${Math.ceil(c.watt/(Math.sqrt(3)*400))} A per fase in trifase (${Math.ceil(c.watt/230)} A se monofase)</span></div></div>`;
       h+=`<div class="pmbox">${(()=>{const k=Math.min(900/Math.max(1,c.pxW),340/Math.max(1,c.pxH)),dw=Math.round(c.pxW*k),dh=Math.round(c.pxH*k);return `<canvas class="pm" data-pm="${i}" width="${dw*2}" height="${dh*2}" style="width:${dw}px${s.cabOn==='1'&&s.cabMode==='man'?';touch-action:none;cursor:crosshair':''}"></canvas>`})()}
       <div class="row noprint" style="margin-top:8px"><b style="flex:1">🎯 Pixelmap ${c.pxW} × ${c.pxH}</b><button class="btn sm" data-pmvid="${i}">🎬 Scarica video loop</button><button class="btn sec sm" data-pmpng="${i}">🖼 PNG</button></div>
       <div class="grid noprint" style="margin-top:8px"><div><label>Vista</label><select data-sf="cabOn"><option value="">🎯 Pixelmap</option><option value="1" ${s.cabOn==='1'?'selected':''}>🔌 Cablaggio</option></select></div>
@@ -532,12 +532,12 @@ function vEvent(id){
       ${s.cabMode==='man'?'':`<div><label>Partenza</label><select data-sf="cabStart">${[['BL','In basso a sinistra'],['BR','In basso a destra'],['TL','In alto a sinistra'],['TR','In alto a destra']].map(([v,l])=>`<option value="${v}" ${(s.cabStart||'BL')===v?'selected':''}>${l}</option>`).join('')}</select></div>
       <div><label>Direzione</label><select data-sf="cabDir"><option value="col" ${(s.cabDir||'col')==='col'?'selected':''}>Per colonne ↕</option><option value="row" ${s.cabDir==='row'?'selected':''}>Per file ↔</option></select></div>`}
       <div><label>Moduli max per porta</label><input type="number" step="1" min="1" data-sf="cabMpp" value="${s.cabMpp||12}"></div>
-      <div><label>Distributore corrente</label><select data-sf="cabA">${[32,64].map(a=>`<option value="${a}" ${(+s.cabA||32)===a?'selected':''}>${a} A</option>`).join('')}</select></div>
-      <div><label>Moduli max per uscita</label><input type="number" step="1" min="1" data-sf="cabMpu" value="${cp.mpu}"></div>
-      <div style="grid-column:1/-1" class="mut">${cp.troppi.length?`<span class="bad">⚠️ Troppi moduli su ${cp.troppi.map(n=>'P'+n).join(', ')} (max ${cp.mpp})</span> · `:''}${s.cabMode==='man'&&cp.liberi?`<span class="bad">${cp.liberi} moduli senza cavo</span> · `:''}🔌 <b>${cp.ports}</b> porte dati (max ${cp.mpp} moduli per porta) · ⚡ <b>${cp.dist}</b> distributor${cp.dist>1?'i':'e'} da ${cp.A} A con 5 uscite (max ${cp.mpu} moduli per uscita, ${cp.mpd} per distributore${+c.it.watt?'':', manca il consumo del modulo'})</div>`})():''}</div></div>`;
+
+      <div style="grid-column:1/-1" class="mut">${cp.troppi.length?`<span class="bad">⚠️ Troppi moduli su ${cp.troppi.map(n=>'P'+n).join(', ')} (max ${cp.mpp})</span> · `:''}${s.cabMode==='man'&&cp.liberi?`<span class="bad">${cp.liberi} moduli senza cavo</span> · `:''}🔌 <b>${cp.ports}</b> porte dati (max ${cp.mpp} moduli per porta)</div>`})():''}</div></div>`;
     } else h+=`<p class="bad">Aggiungi prima un tipo di cassa LED nell'inventario.</p>`;
     h+='</div>';
   });
+  {const W=(ev.screens||[]).map(screenCalc).filter(Boolean).reduce((a,c)=>a+c.watt,0);if(W&&(ev.screens||[]).length>1)h+=`<div class="kpi"><div><b>${(W/1000).toFixed(1)} kW</b><span>consumo max di tutti gli schermi · ~${Math.ceil(W/(Math.sqrt(3)*400))} A per fase in trifase</span></div></div>`}
   h+=`</div>`;
 
   // materiale
@@ -687,7 +687,7 @@ function pmDraw(g,c,t,scr){
     for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){g.fillStyle=((k*nx+i)+(r*ny+j))%2?C2:C1;g.fillRect(x0+i*qw,y0+j*qh,qw+.5,qh+.5)}
     g.strokeStyle=`hsl(${hue},45%,18%)`;g.lineWidth=fw;g.strokeRect(x0+fw/2,y0+fw/2,mw-fw,mh-fw);
     // numero del modulo, al centro
-    const fs=Math.max(9,Math.round(qw*.36)), lab=cp?`P${cp.p} · ${cp.idx}`:`${n+1}`, pos=cp?`⚡ D${cp.d} · U${cp.u}`:`C${k+1} · F${r+1}`, mx=x0+mw/2, my=cp?y0+mh*.24:y0+mh/2;
+    const fs=Math.max(9,Math.round(qw*.36)), lab=cp?`P${cp.p} · ${cp.idx}`:`${n+1}`, pos=`C${k+1} · F${r+1}`, mx=x0+mw/2, my=cp?y0+mh*.24:y0+mh/2;
     g.textAlign='center';g.textBaseline='middle';
     g.font=`600 ${Math.round(fs*.6)}px -apple-system,system-ui,sans-serif`;const pw=g.measureText(pos).width;
     g.font=`800 ${fs}px -apple-system,system-ui,sans-serif`;const bw=Math.max(g.measureText(lab).width,pw)+fs*.8, bh=fs*2;
