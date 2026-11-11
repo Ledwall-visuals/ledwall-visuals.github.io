@@ -11,6 +11,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-512.png">
 <link rel="manifest" href="manifest.json">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <title>Gestionale Ledwall – Inventario & Eventi</title>
@@ -58,6 +59,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
 .seg{display:flex;background:var(--panel2);border-radius:10px;padding:3px;margin-top:10px}.seg button{flex:1;border:0;background:none;color:var(--mut);font:inherit;font-weight:600;padding:7px 0;border-radius:8px;cursor:pointer}.seg button.on{background:var(--acc);color:#fff}
 .mat{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:.5px solid var(--line)}.mat:last-child{border:0}
 .navx{display:none;position:absolute;top:50%;transform:translateY(-50%);gap:6px;align-items:center}.navx.l{left:16px}.navx.r{right:16px}.navx .row{margin:0!important;gap:6px}
+#v3d{position:fixed;inset:0;z-index:100;background:#000}#v3d canvas{display:block;width:100%;height:100%}.v3dbar{position:absolute;top:0;left:0;right:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));background:#000a;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}.v3dhint{position:absolute;left:14px;bottom:max(12px,env(safe-area-inset-bottom));font-size:12px;pointer-events:none}html.v3dopen,html.v3dopen body{overflow:hidden}
 .pmbox{margin-top:12px}.scrrow{cursor:pointer}.scrrow:hover{background:var(--panel2)}.pm{display:block;max-width:100%;height:auto;margin:0 auto;border-radius:10px;background:#000}
 .preview i{display:block;background:#2a4f8f;border-radius:2px}
 .evlist .ev{display:flex;gap:12px;align-items:center;padding:10px;border-bottom:1px solid var(--line);cursor:pointer}
@@ -545,7 +547,7 @@ function vEvent(id){
   if(!(ev.screens||[]).length)L+=`<p class="mut">Nessuno schermo: crealo qui sopra.</p>`;
   (ev.screens||[]).forEach((x,k)=>{L+=`<div class="screen scrrow" data-scropen="${k}" style="${k===i?'border:1px solid var(--acc)':''}"><div class="row" style="flex-wrap:nowrap"><b style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.name||'Schermo')}</b><span class="mut">${k===i?'●':'›'}</span></div></div>`});
   L+=`</div>`;
-  if((ev.screens||[]).length>1)C+=pmAllCard(ev);
+  if((ev.screens||[]).length>1||ev.id==='chiesa')C+=pmAllCard(ev);
   if(s){C+=`<div class="card" data-scr="${i}"><h2>${esc(s.name||'Schermo')}</h2>`;
     let h='';
     if(c){ h+=`<div class="kpi kpi6">
@@ -1025,7 +1027,7 @@ function pmAllInfo(ev){const L=(ev.screens||[]).map((s,k)=>({s:{...s,_i:k},c:scr
   const gap=L.length>1?Math.round(Math.max(...L.map(o=>o.c.it.pxW))*.5):0, W=L.reduce((a,o)=>a+o.c.pxW,0), H=L.length?Math.max(...L.map(o=>o.c.pxH)):0;
   return {L,gap,W,H,Wv:W+gap*Math.max(0,L.length-1)}}
 function pmAllCard(ev){const A=pmAllInfo(ev);if(!A.L.length)return '';const k=Math.min(1,900/A.Wv,300/A.H),dw=Math.round(A.Wv*k),dh=Math.round(A.H*k);
-  return `<div class="card"><div class="row"><h2 style="margin:0">🧩 Configurazione completa</h2><span class="sp"></span><span class="mut">${A.W} × ${A.H} px · ${A.L.reduce((a,o)=>a+o.c.mods,0)} moduli</span></div>
+  return `<div class="card"><div class="row"><h2 style="margin:0">🧩 Configurazione completa</h2><span class="sp"></span>${ev.id==='chiesa'?`<button class="btn sm noprint" data-v3d="${ev.id}" style="margin-right:10px">🧊 Vista 3D</button>`:''}<span class="mut">${A.W} × ${A.H} px · ${A.L.reduce((a,o)=>a+o.c.mods,0)} moduli</span></div>
   <div class="pmbox"><canvas class="pm" data-pmall="${ev.id}" width="${dw*2}" height="${dh*2}" style="width:${dw}px;max-width:100%"></canvas></div>
   <div class="mut" style="margin-top:6px">${A.L.map(o=>`<b>${esc(o.s.name||'Schermo')}</b> ${o.c.pxW}×${o.c.pxH} px`).join(' · ')} — sul canvas gli schermi sono uno accanto all'altro, senza spazio.</div></div>`}
 const PMALL_TMP={};
@@ -1045,6 +1047,10 @@ function vChiesaRO(){const ev=DB.events.find(x=>x.id==='chiesa');
     <div><b>${o.c.pxW} × ${o.c.pxH}</b><span>risoluzione px</span></div><div><b>${o.c.mW.toFixed(2)} × ${o.c.mH.toFixed(2)} m</b><span>misura</span></div>
     <div><b>${(o.c.watt/1000).toFixed(1)} kW</b><span>consumo max</span></div><div><b>${esc(o.c.it.name)}</b><span>${o.c.it.pxW}×${o.c.it.pxH} px per modulo</span></div></div></div>`).join('')}
   <div class="card"><div class="kpi"><div><b>${A.W} × ${A.H} px</b><span>canvas totale</span></div><div><b>${(W/1000).toFixed(1)} kW</b><span>consumo max totale</span></div></div></div>`}
+
+document.addEventListener('click',async e=>{const b=e.target.closest&&e.target.closest('[data-v3d]');if(!b)return;
+  b.disabled=true;const old=b.textContent;b.textContent='Carico il 3D…';
+  try{const m=await import('./chiesa3d.js?v=1');m.apri(b.dataset.v3d)}catch(err){console.error(err);toast('Non riesco a caricare la vista 3D')}finally{b.disabled=false;b.textContent=old}});
 /* ---------- Home ---------- */
 function vHome(){
   const adm=isAdmin(), oggi=oggiS(), me=first(myName());
