@@ -515,7 +515,7 @@ function vEvent(id){
   const dati=window.EVDATI===ev.id;
   let h=`<div class="evgrid">`;
   const topL=`<div class="row noprint evtop evtopL" style="margin-bottom:12px"><button class="btn sec sm" data-act="back">← ${ev.id==='chiesa'?'Home':'Eventi'}</button></div>`;
-  const topR=`<div class="row noprint evtop evtopR" style="margin-bottom:12px;justify-content:flex-end;gap:6px"><button class="btn sec sm" data-act="dupEv">Duplica</button>${IN_FRAME?'':'<button class="btn sec sm" onclick="window.print()">🖨️ Stampa</button>'}${ev.id==='chiesa'?'':'<button class="btn bad sm" data-act="delEv">Elimina</button>'}</div>`;
+  const topR=`<div class="row noprint evtop evtopR" style="margin-bottom:12px;justify-content:flex-end;gap:6px">${ev.id==='chiesa'?'':'<button class="btn sec sm" data-act="dupEv">Duplica</button>'}${IN_FRAME?'':'<button class="btn sec sm" onclick="window.print()">🖨️ Stampa</button>'}${ev.id==='chiesa'?'':'<button class="btn bad sm" data-act="delEv">Elimina</button>'}</div>`;
 
   // ===== SINISTRA: crea / modifica schermo =====
   let L=`<div class="card"><div class="row"><h2 style="margin:0">${s?'✏️ Schermo':'Schermi'}</h2><span class="sp"></span><button class="btn noprint" data-act="addScreen">+ Nuovo</button></div>`;
