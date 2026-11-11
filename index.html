@@ -494,7 +494,6 @@ function vEvents(){
   const fut=evs.filter(e=>(e.end||e.start||'9')>=today), past=evs.filter(e=>(e.end||e.start||'9')<today);
   const row=e=>{const st=status(e);return `<div class="ev" data-open="${e.id}"><div><b>${esc(e.name||'Senza nome')}</b><div class="mut">${fmtD(e.start)}${e.end&&e.end!==e.start?' → '+fmtD(e.end):''} ${e.place?'· '+esc(e.place):''}</div></div><span class="sp"></span><span class="tag ${st.cls}">${st.txt}</span></div>${e._by?`<div class="by" style="padding:0 10px 8px">✏️ ${esc(e._by)} · ${ago(e._at)}</div>`:''}`};
   return `<div class="card"><div class="row"><h2 style="margin:0">Eventi</h2><span class="sp"></span><button class="btn" data-act="addEv">+ Nuovo evento</button></div></div>
-  <div class="card"><div class="ev" data-act="chiesa"><div><b>⛪ Ledwall della chiesa</b><div class="mut">La nostra configurazione fissa: forma, pixelmap e cablaggio</div></div><span class="sp"></span><span class="mut" style="font-size:20px">›</span></div></div>
   <div class="card evlist"><h3 style="margin-top:0">Prossimi</h3>${fut.map(row).join('')||'<p class="mut">Nessun evento. Crea il primo con "+ Nuovo evento".</p>'}
   ${past.length?`<h3>Passati</h3>${past.map(row).join('')}`:''}</div>`;
 }
@@ -515,8 +514,8 @@ function vEvent(id){
   const i=window.SCROPEN, s=i>=0?ev.screens[i]:null, c=s?screenCalc(s):null;
   const dati=window.EVDATI===ev.id;
   let h=`<div class="evgrid">`;
-  const topL=`<div class="row noprint evtop evtopL" style="margin-bottom:12px"><button class="btn sec sm" data-act="back">← Eventi</button></div>`;
-  const topR=`<div class="row noprint evtop evtopR" style="margin-bottom:12px;justify-content:flex-end;gap:6px"><button class="btn sec sm" data-act="dupEv">Duplica</button>${IN_FRAME?'':'<button class="btn sec sm" onclick="window.print()">🖨️ Stampa</button>'}<button class="btn bad sm" data-act="delEv">Elimina</button></div>`;
+  const topL=`<div class="row noprint evtop evtopL" style="margin-bottom:12px"><button class="btn sec sm" data-act="back">← ${ev.id==='chiesa'?'Home':'Eventi'}</button></div>`;
+  const topR=`<div class="row noprint evtop evtopR" style="margin-bottom:12px;justify-content:flex-end;gap:6px"><button class="btn sec sm" data-act="dupEv">Duplica</button>${IN_FRAME?'':'<button class="btn sec sm" onclick="window.print()">🖨️ Stampa</button>'}${ev.id==='chiesa'?'':'<button class="btn bad sm" data-act="delEv">Elimina</button>'}</div>`;
 
   // ===== SINISTRA: crea / modifica schermo =====
   let L=`<div class="card"><div class="row"><h2 style="margin:0">${s?'✏️ Schermo':'Schermi'}</h2><span class="sp"></span><button class="btn noprint" data-act="addScreen">+ Nuovo</button></div>`;
@@ -641,7 +640,7 @@ function vCal(){
   const base=new Date(); base.setDate(1); base.setMonth(base.getMonth()+CALOFF); const oggi=new Date().toISOString().slice(0,10);
   const y=base.getFullYear(),mo=base.getMonth(),days=new Date(y,mo+1,0).getDate(),off=(base.getDay()+6)%7;
   const cell=(d,extra)=>{const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    const evs=isAdmin()?DB.events.filter(e=>e.start&&e.start<=ds&&ds<=(e.end||e.start)):[];
+    const evs=isAdmin()?DB.events.filter(e=>e.id!=='chiesa'&&e.start&&e.start<=ds&&ds<=(e.end||e.start)):[];
     const tu=isSunday(ds)?davDay(ds):'';
     const tk=taskAperti().filter(x=>x.scadenza===ds).length;
     return `<div class="calcell${ds===oggi?' today':''}${isSunday(ds)?' dom':''}"${extra?' style="opacity:.35"':''}><div><span class="cnum">${d.getDate()}</span>${extra&&d.getDate()===1?'<span class="mut"> '+d.toLocaleDateString('it-IT',{month:'short'})+'</span>':''}${tk?` <span title="${tk} task in scadenza" style="font-size:11px">✅${tk>1?tk:''}</span>`:''}</div>${tu}${evs.map(e=>`<div class="chip" data-open="${e.id}">${esc(e.name||'Evento')}</div>`).join('')}</div>`};
@@ -715,6 +714,47 @@ function cabPlan(c,s){
   const pos={};let g=0;chains.forEach((ch,p)=>ch.forEach(([k,r],i)=>{const d=Math.floor(g/mpd),u=Math.floor((g%mpd)/mpu);g++;pos[k+','+r]={p:p+1,idx:i+1,d:d+1,u:u+1}}));
   return {order,chains,mpp,mpu,mpd,ports:chains.length,dist:Math.max(1,Math.ceil(all.length/mpd)),pos,A,liberi:c.mods-all.length,troppi:chains.map((ch,i)=>ch.length>mpp?i+1:0).filter(Boolean)};
 }
+// Rileva il profilo e il rettangolo pieno piu ampio ad ogni disegno.
+function pmGeometry(c){
+ const mw=c.it.pxW,mh=c.it.pxH,top=[],bot=[],hist=Array(c.cols).fill(0);
+ let loX=c.cols,loY=c.rows,hiX=-1,hiY=-1,best={area:0,x:0,y:0,w:0,h:0};
+ for(let y=0;y<c.rows;y++){
+  for(let x=0;x<c.cols;x++){if(c.off.has(x+','+y))hist[x]=0;else{hist[x]++;loX=Math.min(loX,x);loY=Math.min(loY,y);hiX=Math.max(hiX,x);hiY=Math.max(hiY,y)}}
+  const st=[];for(let x=0;x<=c.cols;x++){
+   const h=x===c.cols?0:hist[x];let from=x;
+   while(st.length&&st[st.length-1].h>h){const v=st.pop(),area=v.h*(x-v.x);if(area>best.area)best={area,x:v.x,y:y-v.h+1,w:x-v.x,h:v.h};from=v.x}
+   if(x<c.cols&&h>0&&(!st.length||st[st.length-1].h<h))st.push({x:from,h});
+  }
+ }
+ for(let x=0;x<c.cols;x++){let a=-1,b=-1;for(let y=0;y<c.rows;y++)if(!c.off.has(x+','+y)){if(a<0)a=y;b=y}top[x]=a;bot[x]=b}
+ const bounds=hiX<0?{x:0,y:0,w:c.pxW,h:c.pxH}:{x:loX*mw,y:loY*mh,w:(hiX-loX+1)*mw,h:(hiY-loY+1)*mh};
+ const rect=best.area?{x:best.x*mw,y:best.y*mh,w:best.w*mw,h:best.h*mh}:bounds;
+ return {empty:hiX<0,top,bot,bounds,rect,cx:rect.x+rect.w/2,cy:rect.y+rect.h/2};
+}
+function pmGuides(g,c,geo,lw){
+ if(geo.empty)return;
+ const mw=c.it.pxW,mh=c.it.pxH,b=geo.bounds;
+ g.save();g.beginPath();
+ for(let y=0;y<c.rows;y++)for(let x=0;x<c.cols;x++)if(!c.off.has(x+','+y))g.rect(x*mw,y*mh,mw,mh);
+ g.clip();g.strokeStyle='rgba(255,255,255,.57)';g.lineWidth=lw;g.beginPath();
+ g.moveTo(b.x,b.y);g.lineTo(geo.cx,geo.cy);g.lineTo(b.x+b.w,b.y);
+ g.moveTo(b.x,b.y+b.h);g.lineTo(geo.cx,geo.cy);g.lineTo(b.x+b.w,b.y+b.h);
+ g.stroke();g.setLineDash([lw*4,lw*3]);g.beginPath();
+ g.moveTo(geo.cx,b.y);g.lineTo(geo.cx,b.y+b.h);
+ g.moveTo(b.x,geo.cy);g.lineTo(b.x+b.w,geo.cy);g.stroke();g.restore();
+ g.save();g.strokeStyle='rgba(255,255,255,.9)';g.lineWidth=Math.max(2,lw*1.4);
+ g.lineJoin='round';
+ for(const [arr,lower] of [[geo.top,false],[geo.bot,true]]){
+  g.beginPath();let prev=-1;
+  for(let x=0;x<c.cols;x++){if(arr[x]<0){prev=-1;continue}
+   const yy=(arr[x]+(lower?1:0))*mh;
+   if(prev===x-1){g.lineTo(x*mw,(arr[prev]+(lower?1:0))*mh);g.lineTo(x*mw,yy)}
+   else g.moveTo(x*mw,yy);
+   g.lineTo((x+1)*mw,yy);prev=x;
+  }g.stroke();
+ }
+ g.restore();
+}
 function pmDraw(g,c,t,scr){
   const W=c.pxW,H=c.pxH,mw=c.it.pxW,mh=c.it.pxH;
   g.save();g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,g.canvas.width,g.canvas.height);g.scale(g.canvas.width/W,g.canvas.height/H);
@@ -737,26 +777,43 @@ function pmDraw(g,c,t,scr){
     g.fillStyle='#fff';g.fillText(lab,mx,my-fs*.32);
     g.fillStyle='rgba(255,255,255,.8)';g.font=`600 ${Math.round(fs*.6)}px -apple-system,system-ui,sans-serif`;g.fillText(pos,mx,my+fs*.55);}
   if(cab){pmCab(g,c,t,scr,cab);g.restore();return}
-  // radar dal centro (leggero)
-  // centro: in mezzo alla parte dove ci sono tutte le file accese (es. la parte alta 3 file della chiesa)
-  let cx=W/2;if(c.off.size){const full=[];for(let k=0;k<c.cols;k++){let ok=true;for(let r=0;r<c.rows;r++)if(c.off.has(k+','+r))ok=false;if(ok)full.push(k)}let best=null,st=null;full.forEach((k,j)=>{if(j===0||k!==full[j-1]+1)st=k;if(!best||k-st>best[1]-best[0])best=[st,k]});if(best)cx=(best[0]+best[1]+1)/2*mw}
-  const cy=H/2,R=Math.hypot(W,H),a=t/PM_LOOP*Math.PI*2-Math.PI/2, lw=Math.max(2,Math.round(Math.min(mw,mh)/64));
-  if(g.createConicGradient){const cg=g.createConicGradient(a-1,cx,cy);const k1=1/(Math.PI*2);cg.addColorStop(0,'rgba(255,255,255,0)');cg.addColorStop(k1,'rgba(255,255,255,.35)');cg.addColorStop(k1+.001,'rgba(255,255,255,0)');cg.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=cg;g.fillRect(0,0,W,H)}
-  g.strokeStyle='rgba(255,255,255,.9)';g.lineWidth=lw*1.5;g.beginPath();g.moveTo(cx,cy);g.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);g.stroke();
-  // diagonali, cerchio e croce centrale
-  g.strokeStyle='rgba(255,255,255,.55)';g.lineWidth=lw;g.beginPath();g.moveTo(0,0);g.lineTo(W,H);g.moveTo(W,0);g.lineTo(0,H);g.stroke();
-  g.beginPath();g.arc(cx,cy,Math.min(W,H)*.32,0,Math.PI*2);g.stroke();
-  g.setLineDash([lw*4,lw*3]);g.beginPath();g.moveTo(cx,0);g.lineTo(cx,H);g.moveTo(0,cy);g.lineTo(W,cy);g.stroke();g.setLineDash([]);
-  // cornice esterna
-  const ow=Math.max(3,lw*2);g.strokeStyle='#fff';g.lineWidth=ow;g.strokeRect(ow/2,ow/2,W-ow,H-ow);
-  // etichetta centrale come nelle pixelmap professionali
-  let big=Math.max(16,Math.round(Math.min(W*.14,H*.1)));{g.font='800 '+big+'px -apple-system,system-ui,sans-serif';const m=g.measureText(scr.name||'Schermo').width+big;if(m>W*.9)big=Math.max(14,Math.floor(big*W*.9/m))}const sm=Math.max(10,Math.round(big*.42));
-  g.textAlign='center';g.textBaseline='middle';g.font=`800 ${big}px -apple-system,system-ui,sans-serif`;
-  const l1=scr.name||'Schermo', l2=`W: ${W}  H: ${H}`, l3=`${c.cols} × ${c.rows}${c.off.size?` (${c.mods} moduli)`:' moduli'} · ${mw}×${mh} px`;
-  const w1=g.measureText(l1).width;g.font=`700 ${sm}px -apple-system,system-ui,sans-serif`;const bw=Math.max(w1,g.measureText(l3).width)+big;const bh=big*1.2+sm*2.9;
-  g.fillStyle='rgba(0,0,0,.6)';g.beginPath();g.roundRect?g.roundRect(cx-bw/2,cy-bh/2,bw,bh,big*.3):g.rect(cx-bw/2,cy-bh/2,bw,bh);g.fill();
-  g.fillStyle='#fff';g.font=`800 ${big}px -apple-system,system-ui,sans-serif`;g.fillText(l1,cx,cy-bh/2+big*.75);
-  g.font=`700 ${sm}px -apple-system,system-ui,sans-serif`;g.fillText(l2,cx,cy-bh/2+big*1.35+sm*.7);g.fillStyle='rgba(255,255,255,.8)';g.fillText(l3,cx,cy-bh/2+big*1.35+sm*1.95);
+  // Guida dinamica: profilo superiore/inferiore e linee solo sui moduli accesi.
+  const geo=pmGeometry(c),cx=geo.cx,cy=geo.cy,b=geo.bounds;
+  const a=t/PM_LOOP*Math.PI*2-Math.PI/2,lw=Math.max(2,Math.round(Math.min(mw,mh)/64));
+  if(!geo.empty){
+   g.save();g.beginPath();
+   for(let y=0;y<c.rows;y++)for(let x=0;x<c.cols;x++)if(!c.off.has(x+','+y))g.rect(x*mw,y*mh,mw,mh);
+   g.clip();
+   if(g.createConicGradient){const cg=g.createConicGradient(a-1,cx,cy),k=1/(Math.PI*2);
+    cg.addColorStop(0,'rgba(255,255,255,0)');cg.addColorStop(k,'rgba(255,255,255,.35)');cg.addColorStop(k+.001,'rgba(255,255,255,0)');cg.addColorStop(1,'rgba(255,255,255,0)');
+    g.fillStyle=cg;g.fillRect(b.x,b.y,b.w,b.h)}
+   g.strokeStyle='rgba(255,255,255,.9)';g.lineWidth=lw*1.5;g.beginPath();
+   g.moveTo(cx,cy);g.lineTo(cx+Math.cos(a)*Math.hypot(b.w,b.h),cy+Math.sin(a)*Math.hypot(b.w,b.h));g.stroke();
+   g.strokeStyle='rgba(255,255,255,.55)';g.lineWidth=lw;g.beginPath();
+   g.arc(cx,cy,Math.min(geo.rect.w,geo.rect.h)*.32,0,Math.PI*2);g.stroke();g.restore();
+   pmGuides(g,c,geo,lw);
+   // MAIN ancorato al rettangolo continuo piu grande, senza finire nelle aree spente.
+   const room=geo.rect,l1=scr.name||'Schermo',l2=`W: ${W}  H: ${H}`;
+   const l3=`${c.cols} × ${c.rows}${c.off.size?` (${c.mods} moduli)`:' moduli'} · ${mw}×${mh} px`;
+   let big=Math.max(7,Math.min(Math.round(Math.min(room.w*.14,room.h*.22)),Math.round(Math.min(W*.14,H*.1)))),sm,bw,bh;
+   for(let j=0;j<14;j++){
+    sm=Math.max(5,Math.round(big*.42));
+    g.font=`800 ${big}px -apple-system,system-ui,sans-serif`;const w1=g.measureText(l1).width;
+    g.font=`700 ${sm}px -apple-system,system-ui,sans-serif`;
+    bw=Math.max(w1,g.measureText(l2).width,g.measureText(l3).width)+big;
+    bh=big*1.2+sm*2.9;
+    if((bw<=room.w*.94&&bh<=room.h*.9)||big<=7)break;
+    big=Math.max(7,Math.floor(big*.85));
+   }
+   if(bw<=room.w*.98&&bh<=room.h*.98){
+    g.fillStyle='rgba(0,0,0,.65)';g.beginPath();
+    g.roundRect?g.roundRect(cx-bw/2,cy-bh/2,bw,bh,big*.3):g.rect(cx-bw/2,cy-bh/2,bw,bh);g.fill();
+    g.textAlign='center';g.textBaseline='middle';g.fillStyle='#fff';
+    g.font=`800 ${big}px -apple-system,system-ui,sans-serif`;g.fillText(l1,cx,cy-bh/2+big*.75);
+    g.font=`700 ${sm}px -apple-system,system-ui,sans-serif`;g.fillText(l2,cx,cy-bh/2+big*1.35+sm*.7);
+    g.fillStyle='rgba(255,255,255,.8)';g.fillText(l3,cx,cy-bh/2+big*1.35+sm*1.95);
+   }
+  }
   g.restore();
 }
 const FASE_COL=['#ff9f0a','#bf5af2','#64d2ff'];
@@ -912,7 +969,7 @@ function vHome(){
     ${chi?`<div class="row" style="gap:14px;flex-wrap:nowrap">${m===e?big(m):(m?big(m):'')+(e?big(e):'')}<div><div class="who">${esc(chi)}</div><div style="margin-top:6px" class="row">${mio?'<span class="pill me">✨ Tocca a te</span>':''}<span class="pill">${quando(giorni(ds))}</span>${m!==e?'<span class="pill">☀️ / 🌙 divisi</span>':''}</div></div></div>`:'<p class="mut">Nessun turno impostato.</p>'}
     ${(()=>{const miei=sundays(12).filter(x=>x!==ds&&[turno(x,0),turno(x,1)].some(n=>n&&isMe(n)));return miei.length?`<div class="mut" style="margin-top:14px">I tuoi prossimi turni: ${miei.slice(0,3).map(x=>new Date(x+'T12:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'})).join(' · ')}</div>`:''})()}</div>`;
   // prossimo evento
-  const ev=adm?[...DB.events].filter(x=>(x.end||x.start||'')>=oggi&&x.start).sort((a,b)=>a.start.localeCompare(b.start))[0]:null;
+  const ev=adm?[...DB.events].filter(x=>x.id!=='chiesa'&&(x.end||x.start||'')>=oggi&&x.start).sort((a,b)=>a.start.localeCompare(b.start))[0]:null;
   const evCard=adm?`<div class="card evbig"${ev?` data-open="${ev.id}"`:''}><div class="eyebrow">🎛️ Prossimo evento</div>${ev?`<div class="row" style="align-items:flex-end;flex-wrap:nowrap"><div style="flex:1;min-width:0"><div class="t">${esc(ev.name||'Evento')}</div><div class="mut" style="margin-top:4px">${fmtD(ev.start)}${ev.end&&ev.end!==ev.start?' → '+fmtD(ev.end):''}${ev.place?' · '+esc(ev.place):''}</div><div style="margin-top:10px"><span class="tag ${status(ev).cls}">${status(ev).txt}</span></div></div><div style="text-align:right">${giorni(ev.start)>0?`<div class="count">${giorni(ev.start)}</div><div class="mut">giorni</div>`:'<span class="pill me">In corso</span>'}</div></div>`:'<p class="mut" style="margin:0">Nessun evento in programma.</p><button class="link" data-act="addEv" style="margin-top:8px">+ Crea evento</button>'}</div>`:'';
   // task
   const tasks=taskAperti();
@@ -1046,7 +1103,7 @@ function bind(){
         c={id:'chiesa',name:'⛪ Ledwall chiesa',place:'Chiesa',start:'',end:'',screens:[{name:'LEDWALL',ledId:l?.id,mode:'moduli',w:52,h:3,off,cabOn:'3'}],extras:[],checked:{}};stamp(c);DB.events.push(c);logChange('Creata la configurazione della chiesa')}
         curEv='chiesa';window.SCROPEN=0;window.SCREV='chiesa';rememberUI()},
       addEv(){const t=new Date().toISOString().slice(0,10);const n={id:uid(),name:'Nuovo evento',place:'',start:t,end:'',screens:[],extras:[],checked:{}};stamp(n);DB.events.push(n);curEv=n.id;window.EVDATI=n.id;logChange('Creato un nuovo evento')},
-      back(){curEv=null;view='eventi';rememberUI();render();return 'nosave'},
+      back(){const church=curEv==='chiesa';curEv=null;view=church?'calendario':'eventi';rememberUI();render();return 'nosave'},
       async delEv(){if(await ask('Eliminare l\'evento?')){logChange(`Eliminato evento "${ev.name}"`);DB.events=DB.events.filter(x=>x.id!==curEv);curEv=null}else return 'nosave'},
       dupEv(){const c=JSON.parse(JSON.stringify(ev));c.id=uid();c.name+=' (copia)';c.checked={};stamp(c);DB.events.push(c);curEv=c.id;logChange(`Duplicato evento "${ev.name}"`)},
       addScreen(){const l=DB.items.find(i=>i.cat==='led');ev.screens.unshift({name:'Schermo '+(ev.screens.length+1),ledId:l?.id,mode:'moduli',w:3,h:2});window.SCROPEN=0;window.SCREDIT=true;stamp(ev);logChange(`Evento "${ev.name}": aggiunto schermo`)},
