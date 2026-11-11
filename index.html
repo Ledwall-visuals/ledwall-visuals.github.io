@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Ledwall">
-<meta name="theme-color" content="#09090d">
+<meta name="theme-color" content="#e7f0ec">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-512.png">
 <link rel="manifest" href="manifest.json">
@@ -177,6 +177,91 @@ th,td{border-bottom:.5px solid var(--line)}
 .glist .chev{color:#5a5a5f;font-size:20px}
 .ghead{font-size:13px;color:var(--mut);text-transform:uppercase;margin:0 0 7px 16px}
 @media(max-width:600px){.calcell{min-height:58px}.chip{font-size:9px;padding:1px 2px}.card{padding:14px}.hello h2{font-size:32px}}
+/* ===== Stile dashboard (chiaro menta, sidebar scura, card arrotondate) ===== */
+:root{color-scheme:light;--bg:#e7f0ec;--panel:#fff;--panel2:#f2f6f4;--panel3:#e4ebe8;--line:#e2e9e6;--txt:#14201c;--mut:#73827c;--acc:#1f9d6b;--accd:#0f2a22;--mint:#cdeee0;--ok:#1f9d6b;--warn:#e8892b;--bad:#e5484d;--r:24px;--sh:0 1px 2px #0f2a220a,0 10px 30px #0f2a2214}
+body{background:var(--bg);background-image:radial-gradient(1100px 600px at 85% -10%,#d3efe2 0%,transparent 60%),radial-gradient(900px 600px at -10% 110%,#f5efe3 0%,transparent 60%);background-attachment:fixed;color:var(--txt);letter-spacing:-.01em}
+header{background:#e7f0ecd9;-webkit-backdrop-filter:saturate(160%) blur(18px);backdrop-filter:saturate(160%) blur(18px);border-bottom:0}
+header h1{color:var(--txt)}
+header h1 .logo{background:linear-gradient(160deg,#1f9d6b,#0f2a22)}
+#pwbtn{background:#fff;color:var(--txt);box-shadow:var(--sh)}
+.av{border-color:var(--bg)}
+/* barra di navigazione: pillola scura in basso sul telefono */
+nav{left:10px;right:10px;bottom:calc(8px + env(safe-area-inset-bottom));background:#121a18f0;border:0;border-radius:26px;padding:6px;box-shadow:0 12px 30px #0f2a2240}
+nav button{color:#8fa39c;border-radius:18px;padding:6px 0;transition:background .2s,color .2s}
+nav button.on{background:var(--mint);color:var(--accd)}
+main{padding-bottom:calc(110px + env(safe-area-inset-bottom))}
+#toast{background:#121a18;color:#fff;bottom:calc(96px + env(safe-area-inset-bottom))}
+/* computer: sidebar scura a sinistra con le icone */
+@media(min-width:900px){
+  #shell{padding-left:112px}
+  nav{position:fixed;left:16px;top:16px;bottom:16px;right:auto;width:80px;flex-direction:column;justify-content:flex-start;align-items:center;gap:6px;border-radius:30px;padding:16px 8px;border-bottom:0}
+  nav::before{content:'';width:40px;height:40px;border-radius:14px;margin:2px 0 14px;flex:none;background:linear-gradient(160deg,#5fe0a8,#1f9d6b);box-shadow:inset 0 0 0 9px #121a18,inset 0 0 0 11px #5fe0a8}
+  nav button{flex:none;flex-direction:column;width:64px;padding:10px 0 8px;font-size:10.5px;font-weight:600;gap:5px;border-radius:20px;color:#8fa39c}
+  nav button svg{width:22px;height:22px}
+  nav button:hover{background:#ffffff12;color:#fff}
+  nav button.on{background:var(--mint);color:var(--accd)}
+  nav button[data-v="backup"]{margin-top:auto}
+  .navx{display:none!important}
+  html.evpage .evtop{display:flex!important}
+  header{padding:14px 24px 10px}
+  main{padding:8px 24px 24px;max-width:1240px}
+  main.wide{max-width:1800px}
+  #toast{bottom:24px}
+}
+@media(min-width:1100px){.evgrid{height:calc(100vh - 92px)}}
+@media(min-width:1100px) and (max-width:1499px){.kpi6{grid-template-columns:repeat(3,minmax(0,1fr))}.kpi6 b{white-space:normal}}
+/* card */
+.card{background:var(--panel);border-radius:var(--r);padding:20px;box-shadow:var(--sh);border:1px solid #ffffffb3;transition:transform .25s ease,box-shadow .25s ease}
+.card h2{color:var(--txt)}
+.evbig:hover,.card[data-gov]:hover,.hero:hover{transform:translateY(-3px);box-shadow:0 2px 4px #0f2a220d,0 18px 40px #0f2a221f}
+.hgrid{gap:18px}
+/* card di benvenuto scura come nel riferimento */
+.hero{background:linear-gradient(135deg,#0f2a22 0%,#153c2e 60%,#1d5a42 100%);color:#fff;border:0;position:relative}
+.hero::after{content:'';position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,#5fe0a855,transparent 70%);pointer-events:none}
+.hero .eyebrow,.hero .mut{color:#a9c9bc}
+.hero .who{color:#fff}
+.hero .pill{background:#ffffff1a;color:#fff}.hero .pill.me{background:#ff8a3d;color:#fff}
+.hello h2{color:var(--txt)}
+.eyebrow{color:var(--mut)}
+.count{color:var(--acc)}
+/* controlli */
+input,select,textarea{background:var(--panel2);color:var(--txt);border:1px solid transparent}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--acc);background:#fff}
+.btn{background:var(--acc);color:#fff;border-radius:999px;box-shadow:0 4px 14px #1f9d6b40}
+.btn.sec{background:var(--panel2);color:#16704d;box-shadow:none}
+.btn.bad{background:#fdecec;color:var(--bad);box-shadow:none}
+.btn:hover{filter:brightness(1.05)}
+.tag{background:var(--panel2);color:var(--txt)}
+.seg{background:var(--panel2)}.seg button.on{background:var(--accd);color:#fff}
+.kpi div{background:var(--panel2);border-radius:16px}
+.screen{background:var(--panel2);border-radius:16px}
+.scrrow:hover,.evlist .ev:hover{background:#eaf3ef}
+.evlist .ev{border-radius:14px;border-bottom:1px solid var(--line)}
+th,td,.task,.mat{border-color:var(--line)}
+.ro td{border-top:1px solid var(--line)}
+.glist{background:var(--panel);box-shadow:var(--sh);border-radius:var(--r)}
+.glist .gi{color:var(--txt)}.glist .chev{color:#a7b3ae}
+.task input[type=checkbox]{border-color:#b8c4bf}
+.task input[type=checkbox]:checked{background:var(--acc);border-color:var(--acc)}
+/* calendario */
+.calcell .cnum{color:var(--txt)}
+.calcell.today .cnum{background:var(--accd);color:#fff;border-radius:10px}
+.chip{background:#1f9d6b1f;color:#137a51}
+.dav.me{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--ok)}
+/* finestre */
+#dlg>div,#pwdlg form{background:#fff!important;color:var(--txt);box-shadow:0 30px 80px #0f2a2240}
+#dlg,#pwdlg{background:#0f2a2240!important}
+#login{background:var(--bg)}
+#login form{background:#fff;box-shadow:var(--sh)}
+/* animazioni leggere quando cambi pagina */
+@keyframes su{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:none}}
+#app.anim .card,#app.anim .glist,#app.anim .hello{animation:su .45s cubic-bezier(.2,.8,.2,1) both}
+#app.anim .card:nth-child(2),#app.anim .hgrid .side>:nth-child(2){animation-delay:.05s}
+#app.anim .card:nth-child(3),#app.anim .hgrid .side>:nth-child(3){animation-delay:.1s}
+#app.anim .card:nth-child(4),#app.anim .hgrid .side>:nth-child(4){animation-delay:.15s}
+#app.anim .card:nth-child(n+5){animation-delay:.2s}
+@media(prefers-reduced-motion:reduce){#app.anim *{animation:none!important}.card{transition:none}}
+@media print{body{background:#fff}#shell{padding-left:0!important}}
 </style>
 </head>
 <body>
@@ -440,6 +525,7 @@ function render(){
   const app=document.getElementById('app');
   app.innerHTML = (ANTEPRIMA&&realAdmin()?`<div class="card" style="border:1px solid var(--acc)"><div class="row"><b>👁 Anteprima: vedi il sito come Lucas, Matteo ed Edo</b><span class="sp"></span><button class="btn sm" data-ante="0">Esci dall'anteprima</button></div></div>`:'')
     + (curEv? vEvent(curEv) : ({eventi:vEvents,inventario:adm?vInv:vInvRO,assenze:vAssenze,calendario:vHome,chiesa:vChiesa,registro:vLog,backup:adm?vBackup:vWidget,task:vTask,turni:vTurni}[view]||vCal)());
+  {const k=view+'|'+curEv;if(k!==window.LASTVIEW){app.classList.add('anim');clearTimeout(window.ANIMT);window.ANIMT=setTimeout(()=>app.classList.remove('anim'),800)}window.LASTVIEW=k}
   app.classList.toggle('wide',!!curEv);document.documentElement.classList.toggle('evpage',!!curEv);{const tl=app.querySelector('.evtopL'),tr=app.querySelector('.evtopR');document.getElementById('navL').innerHTML=curEv&&tl?tl.innerHTML:'';document.getElementById('navR').innerHTML=curEv&&tr?tr.innerHTML:''}if(curEv)scrollTo(0,0);
   bind(); drawPresence(); if(typeof track==='function'&&CH)track();
 }
