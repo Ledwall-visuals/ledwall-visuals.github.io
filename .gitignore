@@ -1,1 +1,15 @@
-.netlify
+# Local hosting configuration and credentials
+.netlify/
+.vercel/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
+*.secret
+secrets.json
+credentials.json
+.DS_Store
