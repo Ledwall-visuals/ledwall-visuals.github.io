@@ -555,12 +555,13 @@ function vEvent(id){
       <div><b>${c.pxW} × ${c.pxH}</b><span>risoluzione px (${(c.pxW*c.pxH/1e6).toFixed(2)} MP)</span></div>
       <div><b>${c.kg.toFixed(0)} kg</b><span>peso moduli</span></div>
       <div><b>${(c.watt/1000).toFixed(1)} kW</b><span>consumo max · ~${Math.ceil(c.watt/(Math.sqrt(3)*400))} A/fase${c.watt?` · ${psa(c.watt)} distrib.`:''}</span></div></div>`;
-      h+=`<div class="pmbox">${(()=>{const k=Math.min(900/Math.max(1,c.pxW),340/Math.max(1,c.pxH)),dw=Math.round(c.pxW*k),dh=Math.round(c.pxH*k);return `<canvas class="pm" data-pm="${i}" width="${dw*2}" height="${dh*2}" style="width:${dw}px${(s.cabOn==='1'&&s.cabMode==='man')||s.cabOn==='3'?';touch-action:none;cursor:crosshair':''}"></canvas>`})()}
+      h+=`<div class="pmbox">${(()=>{const k=Math.min(900/Math.max(1,c.pxW),340/Math.max(1,c.pxH)),dw=Math.round(c.pxW*k),dh=Math.round(c.pxH*k);return `<canvas class="pm" data-pm="${i}" width="${dw*2}" height="${dh*2}" style="width:${dw}px${(s.cabOn==='1'&&s.cabMode==='man')||s.cabOn==='3'||s.cabOn==='4'?';touch-action:none;cursor:'+(s.cabOn==='4'?'move':'crosshair'):''}"></canvas>`})()}
       <div class="row noprint" style="margin-top:8px"><b style="flex:1">🎯 Pixelmap ${c.pxW} × ${c.pxH}</b><button class="btn sm" data-pmvid="${i}">🎬 Scarica video loop</button><button class="btn sec sm" data-pmpng="${i}">🖼 PNG</button></div>
-      <div class="grid noprint" style="margin-top:8px"><div><label>Vista</label><select data-sf="cabOn"><option value="">🎯 Pixelmap</option><option value="1" ${s.cabOn==='1'?'selected':''}>🔌 Cablaggio dati</option><option value="2" ${s.cabOn==='2'?'selected':''}>⚡ Corrente</option><option value="3" ${s.cabOn==='3'?'selected':''}>✂️ Forma</option></select></div>
+      <div class="grid noprint" style="margin-top:8px"><div><label>Vista</label><select data-sf="cabOn"><option value="">🎯 Pixelmap</option><option value="1" ${s.cabOn==='1'?'selected':''}>🔌 Cablaggio dati</option><option value="2" ${s.cabOn==='2'?'selected':''}>⚡ Corrente</option><option value="3" ${s.cabOn==='3'?'selected':''}>✂️ Forma</option><option value="4" ${s.cabOn==='4'?'selected':''}>📐 Zona MAIN</option></select></div>
       ${s.cabOn==='3'?`<div style="grid-column:1/-1"><p class="mut" style="margin:0 0 6px">Tocca (o trascina sopra) i moduli per toglierli o rimetterli, oppure scegli da che colonna a che colonna va ogni fila.</p>
         ${[...Array(c.rows)].map((_,r)=>{let a=-1,b=-1;for(let k=0;k<c.cols;k++)if(!c.off.has(k+','+r)){if(a<0)a=k;b=k}return `<div class="row" style="gap:8px;margin:4px 0;flex-wrap:nowrap"><b style="width:60px">Fila ${r+1}</b><span class="mut">da colonna</span><input type="number" min="1" max="${c.cols}" step="1" data-forma="${i}:${r}:a" value="${a<0?'':a+1}" style="width:80px"><span class="mut">a</span><input type="number" min="1" max="${c.cols}" step="1" data-forma="${i}:${r}:b" value="${b<0?'':b+1}" style="width:80px"><span class="mut">${b<0?0:[...Array(c.cols)].filter((_,k)=>!c.off.has(k+','+r)).length} moduli</span></div>`}).join('')}
         <button class="btn sec sm" data-formaall="${i}" style="margin-top:6px">Accendi tutto</button></div>`:''}
+      ${s.cabOn==='4'?(()=>{const z=pmMainZone(c,s,pmGeometry(c));return `<div style="grid-column:1/-1"><p class="mut" style="margin:0 0 8px">Trascina il rettangolo viola per spostare MAIN; trascina gli angoli per ridimensionarlo. La scritta segue sempre il centro. La cornice viola non compare nelle esportazioni.</p><div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">${[['x','Posizione X',z.x],['y','Posizione Y',z.y],['w','Larghezza',z.w],['h','Altezza',z.h]].map(([key,label,value])=>`<div><label>${label} (px)</label><input type="number" min="0" step="1" data-pmzone="${i}:${key}" value="${Math.round(value)}"></div>`).join('')}</div><button class="btn sec sm" data-pmzonereset="${i}" style="margin-top:10px">↺ Ripristina posizione MAIN</button></div>`})():''}
       ${s.cabOn==='2'?(()=>{const pp=powPlan(c,s),w=+c.it.watt||0;if(!w)return `<div style="grid-column:1/-1" class="bad">Manca il consumo del modulo nell'inventario.</div>`;
         return `<div><label>Partenza</label><select data-sf="cabStart">${[['BL','In basso a sinistra'],['BR','In basso a destra'],['TL','In alto a sinistra'],['TR','In alto a destra']].map(([v,l])=>`<option value="${v}" ${(s.cabStart||'BL')===v?'selected':''}>${l}</option>`).join('')}</select></div>
         <div><label>Direzione</label><select data-sf="cabDir"><option value="col" ${(s.cabDir||'col')==='col'?'selected':''}>Per colonne ↕</option><option value="row" ${s.cabDir==='row'?'selected':''}>Per file ↔</option></select></div>
@@ -755,6 +756,35 @@ function pmGuides(g,c,geo,lw){
  }
  g.restore();
 }
+// Zona MAIN scelta dall'utente e memorizzata come frazioni dello schermo.
+const pmClamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function pmMainZone(c,s,geo){
+  const W=c.pxW,H=c.pxH,minW=Math.min(W,Math.max(16,W*.05)),minH=Math.min(H,Math.max(16,H*.12));
+  let z;
+  if(s.pmMainZone&&['x','y','w','h'].every(k=>Number.isFinite(+s.pmMainZone[k]))&&+s.pmMainZone.w>0&&+s.pmMainZone.h>0){
+    const p=s.pmMainZone;z={x:p.x*W,y:p.y*H,w:p.w*W,h:p.h*H};
+  }else{
+    const b=geo.rect,w=pmClamp(Math.min(b.w,W*.32),minW,W),h=pmClamp(Math.min(b.h,H*.86),minH,H);
+    z={x:b.x+(b.w-w)/2,y:b.y+(b.h-h)/2,w,h};
+  }
+  z.w=pmClamp(z.w,minW,W);z.h=pmClamp(z.h,minH,H);
+  z.x=pmClamp(z.x,0,W-z.w);z.y=pmClamp(z.y,0,H-z.h);
+  return z;
+}
+function pmSetMainZone(s,c,z){
+  const W=c.pxW,H=c.pxH,minW=Math.min(W,Math.max(16,W*.05)),minH=Math.min(H,Math.max(16,H*.12));
+  const w=pmClamp(z.w,minW,W),h=pmClamp(z.h,minH,H);
+  s.pmMainZone={x:pmClamp(z.x,0,W-w)/W,y:pmClamp(z.y,0,H-h)/H,w:w/W,h:h/H};
+}
+function pmDrawMainEditor(g,c,z,lw){
+  const d=Math.max(5,Math.min(c.pxW,c.pxH)*.019);
+  g.save();g.strokeStyle='#ba6aff';g.lineWidth=Math.max(3,lw*2);g.setLineDash([]);
+  g.strokeRect(z.x,z.y,z.w,z.h);g.fillStyle='#ba6aff';g.strokeStyle='#13071c';g.lineWidth=Math.max(2,lw*.7);
+  for(const [x,y] of [[z.x,z.y],[z.x+z.w,z.y],[z.x,z.y+z.h],[z.x+z.w,z.y+z.h]]){
+    g.beginPath();g.rect(x-d,y-d,d*2,d*2);g.fill();g.stroke();
+  }
+  g.restore();
+}
 function pmDraw(g,c,t,scr){
   const W=c.pxW,H=c.pxH,mw=c.it.pxW,mh=c.it.pxH;
   g.save();g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,g.canvas.width,g.canvas.height);g.scale(g.canvas.width/W,g.canvas.height/H);
@@ -778,7 +808,7 @@ function pmDraw(g,c,t,scr){
     g.fillStyle='rgba(255,255,255,.8)';g.font=`600 ${Math.round(fs*.6)}px -apple-system,system-ui,sans-serif`;g.fillText(pos,mx,my+fs*.55);}
   if(cab){pmCab(g,c,t,scr,cab);g.restore();return}
   // Guida dinamica: profilo superiore/inferiore e linee solo sui moduli accesi.
-  const geo=pmGeometry(c),cx=geo.cx,cy=geo.cy,b=geo.bounds;
+  const geo=pmGeometry(c),zone=pmMainZone(c,scr,geo),cx=zone.x+zone.w/2,cy=zone.y+zone.h/2,b=geo.bounds;
   const a=t/PM_LOOP*Math.PI*2-Math.PI/2,lw=Math.max(2,Math.round(Math.min(mw,mh)/64));
   if(!geo.empty){
    g.save();g.beginPath();
@@ -791,9 +821,9 @@ function pmDraw(g,c,t,scr){
    g.moveTo(cx,cy);g.lineTo(cx+Math.cos(a)*Math.hypot(b.w,b.h),cy+Math.sin(a)*Math.hypot(b.w,b.h));g.stroke();
    g.strokeStyle='rgba(255,255,255,.55)';g.lineWidth=lw;g.beginPath();
    g.arc(cx,cy,Math.min(geo.rect.w,geo.rect.h)*.32,0,Math.PI*2);g.stroke();g.restore();
-   pmGuides(g,c,geo,lw);
-   // MAIN ancorato al rettangolo continuo piu grande, senza finire nelle aree spente.
-   const room=geo.rect,l1=scr.name||'Schermo',l2=`W: ${W}  H: ${H}`;
+   pmGuides(g,c,{...geo,cx,cy},lw);
+   // MAIN segue sempre la zona modificabile, non il rettangolo calcolato automaticamente.
+   const room=zone,l1=scr.name||'Schermo',l2=`W: ${W}  H: ${H}`;
    const l3=`${c.cols} × ${c.rows}${c.off.size?` (${c.mods} moduli)`:' moduli'} · ${mw}×${mh} px`;
    let big=Math.max(7,Math.min(Math.round(Math.min(room.w*.14,room.h*.22)),Math.round(Math.min(W*.14,H*.1)))),sm,bw,bh;
    for(let j=0;j<14;j++){
@@ -813,6 +843,7 @@ function pmDraw(g,c,t,scr){
     g.font=`700 ${sm}px -apple-system,system-ui,sans-serif`;g.fillText(l2,cx,cy-bh/2+big*1.35+sm*.7);
     g.fillStyle='rgba(255,255,255,.8)';g.fillText(l3,cx,cy-bh/2+big*1.35+sm*1.95);
    }
+   if(scr.cabOn==='4')pmDrawMainEditor(g,c,zone,lw);
   }
   g.restore();
 }
@@ -858,6 +889,7 @@ document.addEventListener('click',async e=>{
   const b=e.target.closest&&e.target.closest('[data-pmpng],[data-pmvid]');if(!b)return;
   const o=pmScreen(b.dataset.pmpng??b.dataset.pmvid);if(!o)return;
   const cv=document.createElement('canvas');cv.width=o.c.pxW;cv.height=o.c.pxH;const g=cv.getContext('2d');
+   if(o.s.cabOn==='4')o.s.cabOn='';
   if(b.dataset.pmpng!==undefined){pmDraw(g,o.c,PM_LOOP*.125,o.s);cv.toBlob(bl=>pmSave(bl,pmFile(o,'png')),'image/png');return}
   if(!cv.captureStream||!window.MediaRecorder){toast('Questo browser non può creare video: usa Safari o Chrome aggiornati');return}
   const tipi=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm'];const mime=tipi.find(m=>MediaRecorder.isTypeSupported(m));
@@ -872,6 +904,63 @@ document.addEventListener('click',async e=>{
   for(let f=0;f<frames;f++){pmDraw(g,o.c,f/fps,o.s);if(tr.requestFrame)tr.requestFrame();b.textContent=`⏳ ${Math.round(f/frames*100)}%`;await new Promise(r=>setTimeout(r,1000/fps))}
   rec.stop();await fine;b.disabled=false;b.textContent=txt0;
   pmSave(new Blob(parts,{type:mime.split(';')[0]}),pmFile(o,mime.includes('mp4')?'mp4':'webm'));toast('Video pronto ✓ (dura '+PM_LOOP+' s e va in loop)');
+});
+
+/* ---------- Editor interattivo della zona MAIN ---------- */
+let PMMAIN_DRAG=null;
+function pmMainPoint(cv,e,c){
+  const b=cv.getBoundingClientRect();
+  return {x:(e.clientX-b.left)/b.width*c.pxW,y:(e.clientY-b.top)/b.height*c.pxH};
+}
+document.addEventListener('pointerdown',e=>{
+  const cv=e.target.closest&&e.target.closest('canvas[data-pm]');if(!cv)return;
+  const o=cabScr(cv.dataset.pm);if(!o||o.s.cabOn!=='4')return;
+  const c=screenCalc(o.s);if(!c||!c.pxW||!c.pxH)return;
+  e.preventDefault();cv.setPointerCapture&&cv.setPointerCapture(e.pointerId);
+  const z=pmMainZone(c,o.s,pmGeometry(c)),p=pmMainPoint(cv,e,c),b=cv.getBoundingClientRect();
+  const hx=22/b.width*c.pxW,hy=22/b.height*c.pxH;
+  let handle='move';
+  for(const [h,x,y] of [['nw',z.x,z.y],['ne',z.x+z.w,z.y],['sw',z.x,z.y+z.h],['se',z.x+z.w,z.y+z.h]]){
+    if(Math.abs(p.x-x)<hx&&Math.abs(p.y-y)<hy){handle=h;break}
+  }
+  if(handle==='move'&&(p.x<z.x||p.x>z.x+z.w||p.y<z.y||p.y>z.y+z.h)){
+    z.x=pmClamp(p.x-z.w/2,0,c.pxW-z.w);z.y=pmClamp(p.y-z.h/2,0,c.pxH-z.h);
+    pmSetMainZone(o.s,c,z);
+  }
+  PMMAIN_DRAG={id:e.pointerId,cv,s:o.s,c,start:{...z},p,handle};
+});
+document.addEventListener('pointermove',e=>{
+  const d=PMMAIN_DRAG;if(!d||d.id!==e.pointerId)return;
+  const p=pmMainPoint(d.cv,e,d.c),dx=p.x-d.p.x,dy=p.y-d.p.y;
+  const z={...d.start},W=d.c.pxW,H=d.c.pxH;
+  const minW=Math.min(W,Math.max(16,W*.05)),minH=Math.min(H,Math.max(16,H*.12));
+  if(d.handle==='move'){z.x=pmClamp(z.x+dx,0,W-z.w);z.y=pmClamp(z.y+dy,0,H-z.h)}
+  else{
+    if(d.handle.includes('w')){const right=z.x+z.w;z.x=pmClamp(z.x+dx,0,right-minW);z.w=right-z.x}
+    else z.w=pmClamp(z.w+dx,minW,W-z.x);
+    if(d.handle.includes('n')){const bottom=z.y+z.h;z.y=pmClamp(z.y+dy,0,bottom-minH);z.h=bottom-z.y}
+    else z.h=pmClamp(z.h+dy,minH,H-z.y);
+  }
+  pmSetMainZone(d.s,d.c,z);
+});
+function pmMainFinish(e){
+  const d=PMMAIN_DRAG;if(!d||d.id!==e.pointerId)return;PMMAIN_DRAG=null;
+  const o=cabScr(d.cv.dataset.pm);if(o){cabSave(o,'spostata o ridimensionata la zona MAIN');render()}
+}
+document.addEventListener('pointerup',pmMainFinish);
+document.addEventListener('pointercancel',pmMainFinish);
+document.addEventListener('change',e=>{
+  const el=e.target.closest&&e.target.closest('[data-pmzone]');if(!el)return;
+  const [i,key]=el.dataset.pmzone.split(':'),o=cabScr(i);if(!o)return;
+  const c=screenCalc(o.s);if(!c)return;
+  const z=pmMainZone(c,o.s,pmGeometry(c)),value=Number(el.value);
+  if(!Number.isFinite(value)){render();return}
+  z[key]=value;pmSetMainZone(o.s,c,z);cabSave(o,'modificate le misure della zona MAIN');render();
+});
+document.addEventListener('click',e=>{
+  const b=e.target.closest&&e.target.closest('[data-pmzonereset]');if(!b)return;
+  const o=cabScr(b.dataset.pmzonereset);if(!o)return;
+  delete o.s.pmMainZone;cabSave(o,'ripristinata la zona MAIN');render();
 });
 
 /* ---------- Cablaggio a mano (come NovaLCT) ---------- */
