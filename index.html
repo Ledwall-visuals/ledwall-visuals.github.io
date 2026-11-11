@@ -593,6 +593,8 @@ function vEvent(id){
   R+=`<div class="card"><div class="row"><h2 style="margin:0">✅ Checklist carico</h2><span class="sp"></span><span class="tag ${fatti===keys.length&&fatti?'ok':''}">${fatti}/${keys.length}</span></div>
     ${keys.map(id=>{const it=item(id);if(!it)return'';const done=ev.checked?.[id];return `<div class="task${done?' fatto':''}"><input type="checkbox" data-chk="${id}" ${done?'checked':''}><div class="tt" style="flex:1"><b>${n[id].qty}</b> ${it.cat==='led'?'casse':'×'} ${esc(it.name)}</div></div>`}).join('')||'<p class="mut">Niente da caricare.</p>'}</div>`;
 
+  // la chiesa ha tutto il materiale già montato: non si conta l'inventario
+  if(ev.id==='chiesa')R=`<div class="card"><h2>📦 Materiale</h2><p class="mut" style="margin:0">Il ledwall della chiesa ha già tutto il suo materiale montato: qui non si conta niente dall'inventario.</p></div>`;
   return h+`<div class="evl">${topL}${L}</div><div class="evc">${C}</div><div class="evr">${topR}${RTOP}<div class="evrs">${R}</div></div></div>`;
 }
 
