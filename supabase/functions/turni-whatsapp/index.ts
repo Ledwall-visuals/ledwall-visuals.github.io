@@ -91,7 +91,7 @@ const breveDi = (ds: string) => {
   return `${d.getUTCDate()} ${m[0].toUpperCase()}${m.slice(1, 3)}`;
 };
 // Testo normalizzato: minuscolo e senza accenti/diacritici (così "sarò", "nu reușesc", "înlocuiesc" diventano "saro", "nu reusesc", "inlocuiesc").
-const norm = (t: string) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[’`]/g, "'").toLowerCase();
+const norm = (t: string) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[’`]/g, "'").toLowerCase();
 // "Non ci sono" in italiano e in rumeno (testo già normalizzato).
 const ASSENZA = new RegExp([
   String.raw`\bnon\s+(ci\s+)?(sono|saro|posso|riesco|vengo|ce\s+la\s+faccio)\b(?!\s+problem)`, String.raw`\bassente\b`, String.raw`\bmanco\b`,
