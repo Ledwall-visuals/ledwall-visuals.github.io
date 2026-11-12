@@ -43,9 +43,12 @@ function turno(T: Turni, ds: string, slot: number, B: Blocco[] = []): string {
 
 // Numeri pseudo-casuali ripetibili a partire da una stringa (stesso giorno/mese → stessi valori).
 function seme(str: string) {
-  let h = 2166136261;
-  for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
-  return (k: number) => { let x = Math.imul((h ^ (k * 0x9e3779b9)) >>> 0, 2654435761) >>> 0; x = (x ^ (x >>> 15)) >>> 0; return (x % 10000) / 10000; };
+  return (k: number) => {
+    let h = 2166136261;
+    for (const c of `${str}#${k}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+    h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+    return ((h >>> 0) % 10000) / 10000;
+  };
 }
 
 function messaggio(T: Turni, off: number, B: Blocco[]): string {
