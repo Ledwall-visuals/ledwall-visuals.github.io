@@ -90,12 +90,27 @@ const breveDi = (ds: string) => {
   const m = d.toLocaleDateString("it-IT", { month: "long", timeZone: "UTC" });
   return `${d.getUTCDate()} ${m[0].toUpperCase()}${m.slice(1, 3)}`;
 };
-const ASSENZA = /(non\s+(ci\s+)?(sono|saro|sarò|posso|riesco|vengo|ce\s+la\s+faccio))|\bassente\b|\bmanco\b/i;
+// Testo normalizzato: minuscolo e senza accenti/diacritici (così "sarò", "nu reușesc", "înlocuiesc" diventano "saro", "nu reusesc", "inlocuiesc").
+const norm = (t: string) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[’`]/g, "'").toLowerCase();
+// "Non ci sono" in italiano e in rumeno (testo già normalizzato).
+const ASSENZA = new RegExp([
+  String.raw`\bnon\s+(ci\s+)?(sono|saro|posso|riesco|vengo|ce\s+la\s+faccio)\b(?!\s+problem)`, String.raw`\bassente\b`, String.raw`\bmanco\b`,
+  String.raw`\bnu\s+(pot|sunt|sint|vin|ajung|reusesc|o\s+sa\s+(fiu|pot|vin|ajung)|voi\s+(fi|putea|veni)|am\s+cum|ma\s+pot)\b`, String.raw`\blipsesc\b`, String.raw`\babsent\b`,
+].join("|"));
+// "Posso sostituirti io" e simili, in italiano e in rumeno.
+const OFFERTA = new RegExp([
+  String.raw`\b(posso|potrei)\s+(sostituir\w*|coprir\w*|venire|andare|farlo|esserci|prenderl\w*)`, String.raw`\bti\s+(sostituisco|copro)\b`,
+  String.raw`\b(lo\s+|la\s+|li\s+)?(sostituisco|copro)\s+io\b`, String.raw`\b(vado|vengo|ci\s+sono|lo\s+faccio|faccio|ci\s+vado|lo\s+prendo)\s+io\b`,
+  String.raw`\bio\s+(ci\s+sono|vado|vengo|posso|lo\s+faccio|sostituisco|copro)\b`,
+  String.raw`\bpot\s+(eu|sa\s+(te|il|o|va)\s+inlocuiesc|sa\s+vin|sa\s+merg|veni|merge)\b`, String.raw`\b(te|il|o|va)\s+inlocuiesc\b`, String.raw`\binlocuiesc\s+eu\b`,
+  String.raw`\b(vin|merg|fac|preiau|ma\s+ocup)\s+eu\b`, String.raw`\beu\s+(pot|vin|merg|fac|preiau|te\s+inlocuiesc)\b`,
+].join("|"));
+const MATTINA = /mattin|diminea/, SERA = /\bsera\b|\bseara\b|stasera|diseara/;
 
 // Cerca la domenica (oggi o futura, entro 8 settimane) in cui `chi` ha un turno e che corrisponde al testo.
 function trovaTurno(T: Turni, B: Blocco[], chi: string, testo: string): { ds: string; slots: number[] } | null {
   const t = testo.toLowerCase();
-  const soloMattina = /mattin/.test(t) && !/sera/.test(t), soloSera = /sera/.test(t) && !/mattin/.test(t);
+  const soloMattina = MATTINA.test(t) && !SERA.test(t), soloSera = SERA.test(t) && !MATTINA.test(t);
   const giorno = t.match(/\b([0-9]{1,2})\b/);
   const d = ROME(); d.setHours(12, 0, 0, 0);
   while (d.getDay() !== 0) d.setDate(d.getDate() + 1);
@@ -156,21 +171,60 @@ Deno.serve(async (req) => {
     const ev = await req.json().catch(() => ({}));
     const sd = ev?.senderData || {}, md = ev?.messageData || {};
     if (ev?.typeWebhook !== "incomingMessageReceived" || sd.chatId !== env.GREEN_CHAT) return json({ ok: true });
-    const testo: string = md.textMessageData?.textMessage || md.extendedTextMessageData?.text || "";
-    if (!ASSENZA.test(testo)) return json({ ok: true });
+    const grezzo: string = md.textMessageData?.textMessage || md.extendedTextMessageData?.text || "";
+    const testo = norm(grezzo);
+    const assenza = ASSENZA.test(testo), offerta = !assenza && OFFERTA.test(testo);
+    if (!assenza && !offerta) return json({ ok: true });
     const tel: Record<string, string> = JSON.parse(env.TELEFONI || "{}");
-    const chi = tel[String(sd.sender || "").replace(/@.*/, "")];
+    const nomeDi = (jid?: string) => tel[String(jid || "").replace(/@.*/, "")];
+    const chi = nomeDi(sd.sender);
     if (!chi) return json({ ok: true, nota: "numero non riconosciuto" });
 
     const { data: row, error } = await sb.from("condiviso").select("data").eq("id", "main").maybeSingle();
     if (error || !row?.data?.turni) return json({ errore: error?.message || "turni non trovati" }, 500);
     const DB = row.data, T = DB.turni as Turni;
     const B = await caricaBlocchi();
+    T.override = T.override || {};
+    T.assenze = T.assenze || {};
+    const stesso = (a?: string, b?: string) => !!a && !!b && first(a).toLowerCase() === first(b).toLowerCase();
+    const salva = async (log: string) => {
+      DB._t = Date.now();
+      const { error: e } = await sb.from("condiviso").update({ data: DB, updated_at: new Date().toISOString(), updated_by: null }).eq("id", "main");
+      if (!e) await sb.from("registro").insert({ user_id: null, nome: "WhatsApp", testo: log });
+      return e;
+    };
+
+    if (offerta) {
+      // Qualcuno si offre di sostituire: si cerca la domenica giusta.
+      // 1) data scritta nel messaggio (o nel messaggio citato); 2) chi ha scritto il messaggio citato (risposta a "non ci sono");
+      // 3) altrimenti la prossima domenica in cui qualcuno ha detto che non c'è.
+      const q = md.quotedMessage || {};
+      const citato = nomeDi(q.participant || md.extendedTextMessageData?.participant);
+      const testoQ = norm(q.textMessage || q.text || q.caption || "");
+      const num = (testo.match(/\b([0-9]{1,2})\b/) || testoQ.match(/\b([0-9]{1,2})\b/) || [])[1];
+      const d = ROME(); d.setHours(12, 0, 0, 0);
+      while (d.getDay() !== 0) d.setDate(d.getDate() + 1);
+      const domeniche: string[] = [];
+      for (let i = 0; i < 8; i++, d.setDate(d.getDate() + 7)) domeniche.push(iso(d));
+      const assenti = (ds: string) => T.assenze![ds] || [];
+      let ds = num ? domeniche.find((x) => +x.slice(8) === +num) : undefined;
+      if (!ds && citato) ds = domeniche.find((x) => assenti(x).some((n) => stesso(n, citato))) || domeniche.find((x) => [0, 1].some((sl) => stesso(turno(T, x, sl, B), citato)));
+      if (!ds) ds = domeniche.find((x) => assenti(x).length && ![0, 1].every((sl) => stesso(turno(T, x, sl, B), chi)));
+      if (!ds) return json({ ok: true, nota: "offerta senza domenica da coprire" });
+      const sl = MATTINA.test(testo) && !SERA.test(testo) ? 0 : SERA.test(testo) && !MATTINA.test(testo) ? 1 : -1;
+      const prima = turno(T, ds, sl < 0 ? 0 : sl, B);
+      if (sl < 0) { T.override[ds] = chi; delete T.override[`${ds}:0`]; delete T.override[`${ds}:1`]; }
+      else T.override[`${ds}:${sl}`] = chi;
+      if (T.assenze[ds]) T.assenze[ds] = T.assenze[ds].filter((n) => !stesso(n, chi));
+      const quandoO = sl < 0 ? "mattina e sera" : sl === 0 ? "mattina" : "sera";
+      const e = await salva(`Turni: ${first(chi)} si offre per domenica ${breveDi(ds)} (${quandoO})` + (prima && !stesso(prima, chi) ? `, al posto di ${first(prima)}` : ""));
+      if (e) return json({ errore: e.message }, 500);
+      return json({ ok: true, offerta: { ds, sl, chi, prima }, inviato: false });
+    }
+
     const f = trovaTurno(T, B, chi, testo);
     if (!f) return json({ ok: true, nota: "nessun turno trovato" });
     const quando = f.slots.length === 2 ? "mattina e sera" : f.slots[0] === 0 ? "mattina" : "sera";
-    T.override = T.override || {};
-    T.assenze = T.assenze || {};
     const io = (n?: string) => n !== undefined && first(n).toLowerCase() === first(chi).toLowerCase();
     if (f.slots.length === 2) {
       // Tutta la giornata: si segna l'assenza e la rotazione del sito/feed sceglie il prossimo libero.
