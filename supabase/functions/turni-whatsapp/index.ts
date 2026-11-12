@@ -6,7 +6,7 @@
 //   ?azione=configura  -> imposta su Green API il webhook dei messaggi in arrivo verso questa funzione
 //   POST con typeWebhook (webhook Green API): se nel gruppo qualcuno scrive "non ci sono", lo sostituisce col prossimo della lista (il jolly solo se nessun altro può)
 //   ?mese=1            -> mese prossimo invece del mese corrente
-//   ?azione=auto       -> (cron giornaliero) invia il lunedì dopo l'ultima domenica del mese i turni del mese nuovo
+//   ?azione=auto       -> (cron ogni 10 min il lunedì mattina) invia il lunedì dopo l'ultima domenica del mese i turni del mese nuovo, a un orario variabile 8:00-11:30
 // Configurazione nella tabella public.config_privata (leggibile solo con service role):
 //   GREEN_URL, GREEN_ID, GREEN_TOKEN, GREEN_CHAT (es. 1203...@g.us), TURNI_SECRET,
 //   TELEFONI (JSON {"39333...": "Nome"}) per riconoscere chi scrive nel gruppo.
@@ -41,6 +41,13 @@ function turno(T: Turni, ds: string, slot: number, B: Blocco[] = []): string {
   return bloccato(T, B, T.jolly, ds) ? "" : (T.jolly || "");
 }
 
+// Numeri pseudo-casuali ripetibili a partire da una stringa (stesso giorno/mese → stessi valori).
+function seme(str: string) {
+  let h = 2166136261;
+  for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return (k: number) => { let x = Math.imul((h ^ (k * 0x9e3779b9)) >>> 0, 2654435761) >>> 0; x = (x ^ (x >>> 15)) >>> 0; return (x % 10000) / 10000; };
+}
+
 function messaggio(T: Turni, off: number, B: Blocco[]): string {
   const oggi = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Rome" }));
   const d = new Date(Date.UTC(oggi.getFullYear(), oggi.getMonth() + off, 1, 12));
@@ -57,7 +64,20 @@ function messaggio(T: Turni, off: number, B: Blocco[]): string {
     righe.push(`• Domenica ${d.getUTCDate()} ${breve}: ` + (m === s ? nm(m) : `☀️ ${nm(m)} · 🌙 ${nm(s)}`));
     d.setUTCDate(d.getUTCDate() + 7);
   }
-  return `Buongiorno, questi sono i turni di ${mese} (mattina e sera):\n\n${righe.join("\n")}\n\nSe non puoi, avvisa per tempo 🙏`;
+  // Testo un po' diverso ogni mese (scelta di Beniamin: non deve sembrare un bot). Il seme dipende dal mese, così l'anteprima coincide con l'invio.
+  const r = seme(`${d.getUTCFullYear()}-${mo}`);
+  const pick = <X,>(L: X[], k: number) => L[Math.floor(r(k) * L.length)];
+  const saluto = pick(["Buongiorno", "Buongiorno a tutti", "Ciao ragazzi", "Buondì", "Ciao a tutti", "Buongiorno ragazzi"], 1);
+  const intro = pick([
+    `ecco i turni di ${mese}`, `questi sono i turni di ${mese}`, `vi mando i turni di ${mese}`,
+    `ecco come siamo messi a ${mese}`, `i turni di ${mese} sono questi`, `ecco le domeniche di ${mese}`,
+  ], 2);
+  const fine = pick([
+    "Se non puoi, avvisa per tempo 🙏", "Se qualcuno non c'è, ditelo prima possibile 🙏", "Se avete impegni, avvisate per tempo 👍",
+    "Chi non può, avvisi appena lo sa 🙏", "Se c'è qualche problema, scrivete qui 👍", "Se non ci siete, fatelo sapere per tempo 🙏",
+  ], 3);
+  const punto = pick([",", "!", ","], 4);
+  return `${saluto}${punto} ${punto === "!" ? intro[0].toUpperCase() + intro.slice(1) : intro}:\n\n${righe.join("\n")}\n\n${fine}`;
 }
 
 const ROME = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Rome" }));
@@ -194,6 +214,10 @@ Deno.serve(async (req) => {
     const ieri = fra(-1);
     if (oggi.getDay() !== 1 || fra(6).getMonth() === ieri.getMonth()) return json({ ok: true, nota: "oggi non si invia" });
     mese = fra(6).getMonth() === oggi.getMonth() ? 0 : 1;
+    // Orario diverso ogni volta: il cron gira ogni 10 minuti la mattina, si invia dopo un minuto "a caso" tra le 8:00 e le 11:30.
+    const target = 8 * 60 + Math.floor(seme(iso(oggi))(7) * 210);
+    if (oggi.getHours() * 60 + oggi.getMinutes() < target) return json({ ok: true, nota: `si invia dopo le ${Math.floor(target / 60)}:${String(target % 60).padStart(2, "0")}` });
+    if (env.ULTIMO_INVIO === iso(oggi)) return json({ ok: true, nota: "già inviato oggi" });
   }
   if (!env.GREEN_CHAT && azione !== "anteprima") return json({ errore: "GREEN_CHAT non impostato" }, 400);
   const { data, error } = await sb.from("condiviso").select("data").eq("id", "main").maybeSingle();
@@ -207,5 +231,6 @@ Deno.serve(async (req) => {
     chatId = st.wid;
   }
   const out = await invia(chatId, testo);
+  if (azione === "auto" && out.ok) await sb.from("config_privata").upsert({ chiave: "ULTIMO_INVIO", valore: iso(ROME()) });
   return json({ inviato: out.ok, risposta: out.risposta, testo }, out.ok ? 200 : 502);
 });
