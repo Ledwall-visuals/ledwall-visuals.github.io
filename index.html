@@ -14,6 +14,7 @@
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
+<script src="ferie.js"></script>
 <title>Gestionale Ledwall – Inventario & Eventi</title>
 <style id="css">
 :root{--bg:#0f1115;--panel:#181b22;--panel2:#20242d;--line:#2c313c;--txt:#e8eaef;--mut:#9aa1ad;--acc:#4f8cff;--ok:#2fbf71;--warn:#f0a020;--bad:#e5484d}
@@ -141,6 +142,10 @@ th,td{border-bottom:.5px solid var(--line)}
 .calcell.today{outline:0;background:none}
 .calcell.today .cnum{background:var(--bad);color:#fff;font-weight:600}
 .calcell .dav{margin:2px auto 0}
+.chip.ferie{background:#30d15833;color:#30d158;cursor:default;border-radius:6px;text-align:center;letter-spacing:.04em;text-transform:uppercase;font-weight:700;position:relative}
+.calcell.fe{overflow:visible}
+.chip.ferie.fn{margin-right:-7px;border-top-right-radius:0;border-bottom-right-radius:0}
+.chip.ferie.fp{margin-left:-2px;border-top-left-radius:0;border-bottom-left-radius:0}
 .chip{background:#0a84ff33;color:#64b5ff;border-radius:4px;padding:1px 4px;margin-top:2px;font-size:11px;font-weight:600;text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .dav{box-shadow:none}
 #toast{background:#2c2c2ef2;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border:0;border-radius:14px;padding:12px 18px;font-weight:500;font-size:15px;bottom:calc(90px + env(safe-area-inset-bottom))}
@@ -844,20 +849,89 @@ document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest
 function vCal(){
   const base=new Date(); base.setDate(1); base.setMonth(base.getMonth()+CALOFF); const oggi=new Date().toISOString().slice(0,10);
   const y=base.getFullYear(),mo=base.getMonth(),days=new Date(y,mo+1,0).getDate(),off=(base.getDay()+6)%7;
+  const FG=mieFerie()?ferieGiorni():new Set();
   const cell=(d,extra)=>{const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const evs=isAdmin()?DB.events.filter(e=>e.id!=='chiesa'&&e.start&&e.start<=ds&&ds<=(e.end||e.start)):[];
     const tu=isSunday(ds)?davDay(ds):'';
     const tk=taskAperti().filter(x=>x.scadenza===ds).length;
-    return `<div class="calcell${ds===oggi?' today':''}${isSunday(ds)?' dom':''}"${extra?' style="opacity:.35"':''}><div><span class="cnum">${d.getDate()}</span>${extra&&d.getDate()===1?'<span class="mut"> '+d.toLocaleDateString('it-IT',{month:'short'})+'</span>':''}${tk?` <span title="${tk} task in scadenza" style="font-size:11px">✅${tk>1?tk:''}</span>`:''}</div>${tu}${evs.map(e=>`<div class="chip" data-open="${e.id}">${esc(e.name||'Evento')}</div>`).join('')}</div>`};
+    // ferie come una barra unica sui giorni consecutivi della stessa settimana: angoli tondi solo all'inizio e alla fine
+    const ieri=new Date(d.getFullYear(),d.getMonth(),d.getDate()-1),dom=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1),g=(d.getDay()+6)%7,iso=x=>`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+    const fP=g>0&&FG.has(iso(ieri)),fN=g<6&&FG.has(iso(dom));
+    const fe=FG.has(ds)?`<div class="chip ferie${fP?' fp':''}${fN?' fn':''}" title="Ferie (dal portale del lavoro)">${fP?'&nbsp;':'Ferie'}</div>`:'';
+    return `<div class="calcell${ds===oggi?' today':''}${isSunday(ds)?' dom':''}${fe?' fe':''}"${extra?' style="opacity:.35"':''}><div><span class="cnum">${d.getDate()}</span>${extra&&d.getDate()===1?'<span class="mut"> '+d.toLocaleDateString('it-IT',{month:'short'})+'</span>':''}${tk?` <span title="${tk} task in scadenza" style="font-size:11px">✅${tk>1?tk:''}</span>`:''}</div>${fe}${tu}${evs.map(e=>`<div class="chip" data-open="${e.id}">${esc(e.name||'Evento')}</div>`).join('')}</div>`};
   let h=`<div class="card"><div class="row" style="margin-bottom:10px;flex-wrap:nowrap"><button class="btn sec sm" data-calm="-1" aria-label="Mese precedente">‹</button><h2 style="text-transform:capitalize;margin:0;flex:1;text-align:center">${base.toLocaleDateString('it-IT',{month:'long',year:'numeric'})}</h2>${CALOFF?'<button class="btn sec sm" data-calm="0">Oggi</button>':''}<button class="btn sec sm" data-calm="1" aria-label="Mese successivo">›</button></div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px">`;
   ['L','M','M','G','V','S','D'].forEach(x=>h+=`<div class="mut" style="text-align:center;font-size:11px;font-weight:600;letter-spacing:.06em">${x}</div>`);
   for(let i=0;i<off;i++)h+='<div></div>';
   for(let g=1;g<=days;g++)h+=cell(new Date(y,mo,g),false);
   // giorni del mese successivo fino alla domenica dopo la fine del mese
   const d=new Date(y,mo,days+1); do{h+=cell(new Date(d),true);d.setDate(d.getDate()+1)}while(new Date(d.getTime()-864e5).getDay()!==0);
-  h+=`</div>${legenda()}</div>`;
+  h+=`</div>${legenda()}${mieFerie()?ferieRiga():''}</div>`;
   return h;
 }
+/* ---------- Ferie dal portale del lavoro (solo Benni) ---------- */
+// Il browser entra nel portale PubblicaWeb (Studio Paladin) con codice fiscale e password, legge i comunicati
+// "Ferie"/"Chiusure" (date estratte da ferie.js) e le mostra nel calendario. Tutto resta in questo browser:
+// niente passa dal database del gestionale. Stessa logica del widget Scriptable.
+const PORTALE='https://pubblicazione.dataservices.it/pubblicaweb/studiopaladin', FKEY=KEY+'-ferie', FCRED=KEY+'-ferie-cred';
+function mieFerie(){return !!(USER&&USER.id===CHIESA_OWNER&&!ANTEPRIMA)}
+let FERIE=(()=>{try{return JSON.parse(localStorage.getItem(FKEY))||{agg:0,doc:{}}}catch(e){return {agg:0,doc:{}}}})(), FERIE_STATO='', FERIE_FORM=false;
+const ferieGiorni=()=>new Set(Object.values(FERIE.doc||{}).flatMap(x=>x.date||[]));
+const ferieCred=()=>{try{return JSON.parse(localStorage.getItem(FCRED))}catch(e){return null}};
+function ferieRiga(){
+  const cr=ferieCred(), agg=FERIE.agg?new Date(FERIE.agg).toLocaleString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+  const n=Object.values(FERIE.doc||{}).filter(x=>(x.date||[]).length).length;
+  const form=FERIE_FORM||(!cr&&!FERIE.agg)?`<div class="row" style="gap:8px;margin-top:8px"><input id="feCf" placeholder="Codice fiscale" autocomplete="username" value="${esc(cr&&cr.cf||'')}" style="flex:1;min-width:150px;text-transform:uppercase"><input id="fePw" type="password" placeholder="Password del portale" autocomplete="current-password" style="flex:1;min-width:150px"><label class="mut row" style="gap:4px"><input type="checkbox" id="feRic" style="width:auto;margin:0" ${cr||!FERIE.agg||FERIE_FORM?'checked':''}>Ricorda su questo dispositivo</label><button class="btn sm" data-ferie="login">Leggi le ferie</button></div>`:'';
+  return `<div style="margin-top:12px;padding-top:10px;border-top:1px solid #ffffff14"><div class="row" style="gap:8px"><span>🌴 <b>Ferie dal portale del lavoro</b></span><span class="mut">${FERIE_STATO||(FERIE.errore?'<span class="bad">'+esc(FERIE.errore)+'</span>':agg?`${n} comunicat${n===1?'o':'i'} · aggiornate ${agg}`:'')}</span><span class="sp"></span>${FERIE_STATO?'':`<button class="btn sec sm" data-ferie="${cr?'aggiorna':'form'}">${cr?'Aggiorna':'Accedi'}</button>`}</div>${form}<div class="mut" style="font-size:11px;margin-top:4px">Visibile solo a te.</div></div>`;
+}
+async function portaleJ(percorso,tk,metodo,corpo){
+  const r=await fetch(PORTALE+percorso,{method:metodo||'GET',headers:Object.assign({Accept:'application/json'},tk?{'X-Auth-Token':tk}:{},corpo?{'Content-Type':'application/json'}:{}),body:corpo?JSON.stringify(corpo):undefined});
+  if(!r.ok)throw new Error('portale '+r.status);return r.json();
+}
+function oggettiJ(x,out){out=out||[];if(Array.isArray(x))x.forEach(y=>oggettiJ(y,out));else if(x&&typeof x==='object'){out.push(x);Object.values(x).forEach(y=>{if(y&&typeof y==='object')oggettiJ(y,out)})}return out}
+let PDFJS=null;
+function caricaPdfJs(){if(window.pdfjsLib&&window.pdfjsWorker)return Promise.resolve();if(PDFJS)return PDFJS;
+  const v='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/',js=u=>new Promise((ok,ko)=>{const t=document.createElement('script');t.src=u;t.onload=ok;t.onerror=()=>ko(new Error('pdf.js non caricato'));document.head.appendChild(t)});
+  return PDFJS=js(v+'pdf.min.js').then(()=>js(v+'pdf.worker.min.js'));}
+async function testoPdfB(buf){await caricaPdfJs();const doc=await pdfjsLib.getDocument({data:new Uint8Array(buf),isEvalSupported:false}).promise;let s='';
+  for(let p=1;p<=doc.numPages;p++){const c=await(await doc.getPage(p)).getTextContent();s+=c.items.map(x=>x.str+(x.hasEOL?'\n':'')).join('')+'\n'}return s}
+async function aggiornaFerie(cf,pw){
+  FERIE_STATO='Lettura in corso…';render();
+  try{
+    const login=await portaleJ('/api/v1/account',null,'POST',{username:cf,password:pw,twoFactorEnabled:false}).catch(()=>null);
+    if(!login||!login.AuthToken)throw new Error('Accesso non riuscito: controlla codice fiscale e password');
+    if(login.OtpRequired)throw new Error('Il portale chiede il codice OTP');
+    const tk=login.AuthToken, docs={};
+    for(const rp of oggettiJ(await portaleJ('/api/v2/repositories',tk)).filter(x=>x.Id!=null)){
+      const percorsi=new Set(['/']);
+      try{oggettiJ(await portaleJ('/api/v3/Folders/GetTree?repositoryId='+rp.Id+'&path=%2F&unread=true',tk)).forEach(o=>{const p=(o.data&&o.data.path)||o.path||o.Path;if(typeof p==='string')percorsi.add(p.startsWith('/')?p:'/'+p)})}catch(e){}
+      for(const p of percorsi){let l;try{l=await portaleJ('/api/v1/Documents?repositoryId='+rp.Id+'&path='+encodeURIComponent(p),tk)}catch(e){continue}
+        oggettiJ(l).filter(o=>o.Id!=null&&typeof(o.Name||o.FileName)==='string').forEach(o=>docs[o.Id]=o.Name||o.FileName)}
+    }
+    for(const [id,nome] of Object.entries(docs)){
+      if(!eDiFerie(nome)||(FERIE.doc[id]&&FERIE.doc[id].date))continue;
+      FERIE_STATO='Leggo '+nome+'…';render();
+      const r=await fetch(PORTALE+'/api/v1/DocumentDownload?Id='+encodeURIComponent(id),{headers:{'X-Auth-Token':tk}});
+      if(!r.ok)throw new Error('Download non riuscito ('+r.status+'): '+nome);
+      let buf=await r.arrayBuffer();
+      const inizio=new TextDecoder().decode(buf.slice(0,600));
+      if(!inizio.startsWith('%PDF')){const u=(inizio.match(/https:[^"\s]+/)||[])[0];if(u)buf=await(await fetch(u.replace(/\\u0026/g,'&'))).arrayBuffer()}
+      const testo=await testoPdfB(buf);
+      FERIE.doc[id]={nome,date:perMe(testo.slice(0,500))?dateFerie(testo,nome):[]};
+    }
+    fetch(PORTALE+'/api/v1/account/logout?authToken='+encodeURIComponent(tk),{method:'DELETE',headers:{'X-Auth-Token':tk}}).catch(()=>{});
+    FERIE.errore=null;FERIE_FORM=false;
+  }catch(e){FERIE.errore=String(e&&e.message||e)}
+  FERIE.agg=Date.now();FERIE_STATO='';try{localStorage.setItem(FKEY,JSON.stringify(FERIE))}catch(e){}
+  render();
+}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-ferie]');if(!b||!mieFerie())return;const a=b.dataset.ferie;
+  if(a==='form'){FERIE_FORM=true;render();return}
+  if(a==='aggiorna'){const cr=ferieCred();if(cr)aggiornaFerie(cr.cf,cr.pw);else{FERIE_FORM=true;render()}return}
+  if(a==='login'){const cf=(document.getElementById('feCf').value||'').trim().toUpperCase(),pw=document.getElementById('fePw').value||'';if(!cf||!pw){toast('Inserisci codice fiscale e password');return}
+    try{if(document.getElementById('feRic').checked)localStorage.setItem(FCRED,JSON.stringify({cf,pw}));else localStorage.removeItem(FCRED)}catch(_){}
+    aggiornaFerie(cf,pw)}});
+// aggiornamento automatico (al massimo ogni 6 ore) se la password è ricordata su questo dispositivo
+setInterval(()=>{const cr=ferieCred();if(mieFerie()&&cr&&!FERIE_STATO&&Date.now()-(FERIE.agg||0)>6*3600e3)aggiornaFerie(cr.cf,cr.pw)},20000);
 /* ---------- Assenze (blocchi di indisponibilità) ---------- */
 // Tabella 'blocchi' (chiunque aggiunge i propri, admin anche per altri) + data.turni.assenze dal gruppo WhatsApp
 let BLOCCHI=[];
