@@ -142,7 +142,10 @@ th,td{border-bottom:.5px solid var(--line)}
 .calcell.today{outline:0;background:none}
 .calcell.today .cnum{background:var(--bad);color:#fff;font-weight:600}
 .calcell .dav{margin:2px auto 0}
-.chip.ferie{background:#30d15829;color:#30d158;cursor:default}
+.chip.ferie{background:#30d15833;color:#30d158;cursor:default;border-radius:6px;text-align:center;letter-spacing:.04em;text-transform:uppercase;font-weight:700;position:relative}
+.calcell.fe{overflow:visible}
+.chip.ferie.fn{margin-right:-7px;border-top-right-radius:0;border-bottom-right-radius:0}
+.chip.ferie.fp{margin-left:-2px;border-top-left-radius:0;border-bottom-left-radius:0}
 .chip{background:#0a84ff33;color:#64b5ff;border-radius:4px;padding:1px 4px;margin-top:2px;font-size:11px;font-weight:600;text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .dav{box-shadow:none}
 #toast{background:#2c2c2ef2;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border:0;border-radius:14px;padding:12px 18px;font-weight:500;font-size:15px;bottom:calc(90px + env(safe-area-inset-bottom))}
@@ -851,8 +854,11 @@ function vCal(){
     const evs=isAdmin()?DB.events.filter(e=>e.id!=='chiesa'&&e.start&&e.start<=ds&&ds<=(e.end||e.start)):[];
     const tu=isSunday(ds)?davDay(ds):'';
     const tk=taskAperti().filter(x=>x.scadenza===ds).length;
-    const fe=FG.has(ds)?'<div class="chip ferie" title="Dal portale del lavoro">🌴 Ferie</div>':'';
-    return `<div class="calcell${ds===oggi?' today':''}${isSunday(ds)?' dom':''}"${extra?' style="opacity:.35"':''}><div><span class="cnum">${d.getDate()}</span>${extra&&d.getDate()===1?'<span class="mut"> '+d.toLocaleDateString('it-IT',{month:'short'})+'</span>':''}${tk?` <span title="${tk} task in scadenza" style="font-size:11px">✅${tk>1?tk:''}</span>`:''}</div>${fe}${tu}${evs.map(e=>`<div class="chip" data-open="${e.id}">${esc(e.name||'Evento')}</div>`).join('')}</div>`};
+    // ferie come una barra unica sui giorni consecutivi della stessa settimana: angoli tondi solo all'inizio e alla fine
+    const ieri=new Date(d.getFullYear(),d.getMonth(),d.getDate()-1),dom=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1),g=(d.getDay()+6)%7,iso=x=>`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+    const fP=g>0&&FG.has(iso(ieri)),fN=g<6&&FG.has(iso(dom));
+    const fe=FG.has(ds)?`<div class="chip ferie${fP?' fp':''}${fN?' fn':''}" title="Ferie (dal portale del lavoro)">${fP?'&nbsp;':'Ferie'}</div>`:'';
+    return `<div class="calcell${ds===oggi?' today':''}${isSunday(ds)?' dom':''}${fe?' fe':''}"${extra?' style="opacity:.35"':''}><div><span class="cnum">${d.getDate()}</span>${extra&&d.getDate()===1?'<span class="mut"> '+d.toLocaleDateString('it-IT',{month:'short'})+'</span>':''}${tk?` <span title="${tk} task in scadenza" style="font-size:11px">✅${tk>1?tk:''}</span>`:''}</div>${fe}${tu}${evs.map(e=>`<div class="chip" data-open="${e.id}">${esc(e.name||'Evento')}</div>`).join('')}</div>`};
   let h=`<div class="card"><div class="row" style="margin-bottom:10px;flex-wrap:nowrap"><button class="btn sec sm" data-calm="-1" aria-label="Mese precedente">‹</button><h2 style="text-transform:capitalize;margin:0;flex:1;text-align:center">${base.toLocaleDateString('it-IT',{month:'long',year:'numeric'})}</h2>${CALOFF?'<button class="btn sec sm" data-calm="0">Oggi</button>':''}<button class="btn sec sm" data-calm="1" aria-label="Mese successivo">›</button></div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px">`;
   ['L','M','M','G','V','S','D'].forEach(x=>h+=`<div class="mut" style="text-align:center;font-size:11px;font-weight:600;letter-spacing:.06em">${x}</div>`);
   for(let i=0;i<off;i++)h+='<div></div>';
