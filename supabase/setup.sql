@@ -19,3 +19,14 @@ create policy "solo_proprietario" on public.stato
 -- Task e to-do list (10 nov 2026): tabella public.attivita (tipo task|lista, comune true/false, voci jsonb).
 -- RLS: vedi comuni o tue; crea le tue; modifica comuni o tue; elimina tue (o admin sulle comuni). Trigger attivita_guard.
 -- token_personale (10 nov 2026): un token per utente; il feed con &u=<token> aggiunge le task/liste "Solo io" di quella persona.
+
+-- Turni di lavoro e ferie di chi usa il widget con LAVORO=true (13 nov 2026): li scrive il feed (POST &azione=lavoro, token personale),
+-- li legge solo il proprietario.
+create table if not exists public.lavoro_personale (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  dati jsonb not null default '{}'::jsonb,
+  agg timestamptz not null default now()
+);
+alter table public.lavoro_personale enable row level security;
+drop policy if exists "solo_proprietario_legge" on public.lavoro_personale;
+create policy "solo_proprietario_legge" on public.lavoro_personale for select to authenticated using (auth.uid() = user_id);
