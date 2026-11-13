@@ -199,7 +199,8 @@ function applicaFerie(lav, ferie) {
     if (da) out.push(Object.assign({}, l, { s: g0(da), e: g0(dopo(fine)) }));
   });
   // una barra "Ferie" per ogni periodo di giorni consecutivi
-  const ord = [...F].sort(); let i = 0;
+  // sabato e domenica non serve segnarli come ferie
+  const ord = [...F].filter(x => { const g = new Date(x + "T12:00").getDay(); return g !== 0 && g !== 6; }).sort(); let i = 0;
   while (i < ord.length) { let j = i; while (j + 1 < ord.length && ord[j + 1] === dopo(ord[j])) j++; out.push({ s: g0(ord[i]), e: g0(dopo(ord[j])), all: true, t: "Ferie", cal: "Ferie", col: { hex: "30d158" }, ferie: true }); i = j + 1; }
   return out;
 }

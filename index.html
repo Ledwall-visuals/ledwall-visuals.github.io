@@ -892,7 +892,7 @@ function barreLavoro(){
     for(;s<=fine;s=dopo(s)){if(!F.has(s)){if(!da)da=s}else if(da){out.push(Object.assign({},l,{s:g0(da),e:g0(s)}));da=null}}
     if(da)out.push(Object.assign({},l,{s:g0(da),e:g0(dopo(fine))}));
   });
-  const ord=[...F].sort();let i=0;
+  const ord=[...F].filter(x=>{const g=new Date(x+'T12:00').getDay();return g!==0&&g!==6}).sort();let i=0; // niente ferie di sabato e domenica
   while(i<ord.length){let j=i;while(j+1<ord.length&&ord[j+1]===dopo(ord[j]))j++;out.push({s:g0(ord[i]),e:g0(dopo(ord[j])),all:true,cal:'Ferie',col:'30d158'});i=j+1}
   // inizio e fine reali (per gli eventi "tutto il giorno" gli orari standard del turno)
   return out.map(l=>{if(!l.all)return Object.assign({a:l.s,b:l.e},l);const h=ORE_LAV[l.cal.trim().toLowerCase()]||[8,17];
