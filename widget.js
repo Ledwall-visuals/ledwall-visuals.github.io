@@ -42,16 +42,178 @@ if (typeof LAVORO !== "undefined" && LAVORO) try {
     lavoro = (await CalendarEvent.between(da, a, cals)).map(e => ({ s: e.startDate, e: e.endDate, all: e.isAllDay, t: e.title, cal: e.calendar.title, col: e.calendar.color }));
   }
 } catch (e) { lavoro = []; }
+// ── Ferie e chiusure dal portale del lavoro (PubblicaWeb – Studio Paladin) ──
+// Il widget entra nel portale con codice fiscale e password salvati nel Portachiavi di Scriptable (mai nel codice),
+// cerca i documenti con "Ferie" o "Chiusure" nel nome, legge le date dal PDF e al posto del turno mostra "Ferie".
+// La prima volta va avviato dall'app Scriptable: chiede codice fiscale e password.
+const PORTALE = "https://pubblicazione.dataservices.it/pubblicaweb/studiopaladin";
+const KC_CF = "portale-lavoro-cf", KC_PW = "portale-lavoro-pw";
+// il mio reparto e la mia linea (Produzione, Superfici, linea Bos5); nel loader si possono cambiare con const REPARTO = "a, b, c"
+const MIEI = String(typeof REPARTO !== "undefined" && REPARTO ? REPARTO : "Produzione, Superfici, Bos5").toLowerCase().split(",").map(x => x.trim().replace(/\s+/g, "")).filter(Boolean);
+const ALTRI = ["uffici", "ufficio", "magazzino", "logistica", "amministrazione", "commerciale", "profili", "montaggio", "tamburato"];
+const MESI = { gennaio: 0, febbraio: 1, marzo: 2, aprile: 3, maggio: 4, giugno: 5, luglio: 6, agosto: 7, settembre: 8, ottobre: 9, novembre: 10, dicembre: 11 };
+const RE_MESE = "(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)";
+const isoG = (y, m, g) => y + "-" + String(m + 1).padStart(2, "0") + "-" + String(g).padStart(2, "0");
+
+// date di ferie/chiusura scritte in italiano nel comunicato → ["2026-12-07", ...]
+function dateFerie(testo, nome, oggi) {
+  oggi = oggi || new Date();
+  let t = String(testo || "").replace(/[’‘`´]/g, "'").replace(/(\d)\s*[°º]/g, "$1").replace(/\s+/g, " ");
+  t = t.replace(new RegExp("[a-zàèéìòù']+,\\s*\\d{1,2}\\s+" + RE_MESE + "\\s+\\d{4}", "gi"), " · "); // data della lettera ("Mansuè, 2 ottobre 2026")
+  t = t.replace(/\([^)]*\)/g, " "); // tra parentesi ci sono di solito le eccezioni ("saranno giornate lavorative il 28...")
+  const low = t.toLowerCase(), tutto = (String(nome || "") + " " + low).toLowerCase();
+  // anno di ogni mese preso dal titolo o dal testo (es. "Dicembre 2026-Gennaio 2027")
+  const annoMese = {};
+  for (const m of tutto.matchAll(new RegExp(RE_MESE + "\\s+(\\d{4})", "g"))) if (annoMese[m[1]] == null) annoMese[m[1]] = +m[2];
+  const anno = (mese, y) => {
+    if (y) return +y;
+    if (annoMese[mese] != null) return annoMese[mese];
+    const yn = String(nome || "").match(/\b(20\d\d)\b/); if (yn) return +yn[1];
+    const Y = oggi.getFullYear(), m = MESI[mese], diff = m - oggi.getMonth();
+    return diff < -5 ? Y + 1 : diff > 6 ? Y - 1 : Y;
+  };
+  const out = new Set();
+  const aggiungi = (a, b) => { const x = new Date(a.getFullYear(), a.getMonth(), a.getDate(), 12); for (let k = 0; x <= b && k < 120; k++) { out.add(isoG(x.getFullYear(), x.getMonth(), x.getDate())); x.setDate(x.getDate() + 1); } };
+  // 1) periodi: "dal 24 al 27 dicembre 2026", "dal 31 dicembre 2026 all'8 gennaio 2027", "dal 10 agosto al 21 agosto"
+  const giorno = "(?:lunedì|martedì|mercoledì|giovedì|venerdì|sabato|domenica|lunedi|martedi|mercoledi|giovedi|venerdi)?\\s*";
+  const rePeriodo = new RegExp("\\bdal(?:l')?\\s*" + giorno + "(\\d{1,2})(?:\\s+" + RE_MESE + ")?(?:\\s+(\\d{4}))?\\s+(?:al(?:l')?|fino al(?:l')?)\\s*" + giorno + "(\\d{1,2})\\s+" + RE_MESE + "(?:\\s+(\\d{4}))?", "g");
+  let resto = low.replace(rePeriodo, (all, g1, m1, y1, g2, m2, y2) => {
+    const yb = anno(m2, y2), mb = MESI[m2], ma = m1 ? MESI[m1] : mb;
+    const ya = y1 ? +y1 : (ma > mb ? yb - 1 : (m1 ? anno(m1, null) : yb));
+    const a = new Date(ya, ma, +g1, 12), b = new Date(yb, mb, +g2, 12);
+    if (b >= a) aggiungi(a, b);
+    return " · ";
+  });
+  // 2) giorni singoli o elenchi in frasi che parlano di chiusura/ferie: "resterà chiusa lunedì 7 e martedì 8 dicembre"
+  resto = resto.replace(/(lunedì|martedì|mercoledì|giovedì|venerdì|sabato|domenica|lunedi|martedi|mercoledi|giovedi|venerdi)(?![a-z])/g, " ").replace(/\s+/g, " ");
+  resto.split(/[.;:!?]\s/).forEach(fr => {
+    if (!/chius|ferie|ponte|festivit|non lavorat/.test(fr) || /riprend|lavorativ|apert|rientr/.test(fr)) return;
+    for (const m of fr.matchAll(new RegExp("((?:\\d{1,2}\\s*(?:,|e|ed)\\s*)*\\d{1,2})\\s+" + RE_MESE + "(?:\\s+(\\d{4}))?", "g"))) {
+      const y = anno(m[2], m[3]);
+      m[1].split(/\s*(?:,|ed|e)\s*/).filter(Boolean).forEach(g => { const n = +g; if (n >= 1 && n <= 31) out.add(isoG(y, MESI[m[2]], n)); });
+    }
+  });
+  return [...out].sort();
+}
+
+// è per me? sì se cita il mio reparto o la mia linea, no se cita solo altri reparti, sì se non ne cita nessuno
+function perMe(testo) {
+  const n = String(testo || "").toLowerCase(), compatto = n.replace(/\s+/g, "");
+  if (MIEI.some(r => compatto.includes(r))) return true;
+  return !ALTRI.some(r => new RegExp("\\b" + r + "\\b").test(n));
+}
+// solo i comunicati di ferie/chiusure, e se il nome indica un reparto, solo il mio
+function eDiFerie(nome) { return /ferie|chiusur/i.test(String(nome || "")) && perMe(nome); }
+
+// testo del PDF con pdf.js dentro un WebView (Scriptable non sa leggere i PDF da solo)
+async function testoPdf(dati) {
+  const wv = new WebView();
+  const v = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/";
+  await wv.loadHTML(`<script src="${v}pdf.min.js"></script><script src="${v}pdf.worker.min.js"></script>`);
+  return await wv.evaluateJavaScript(`(async()=>{try{
+    const b=atob(${JSON.stringify(dati.toBase64String())}),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
+    const doc=await pdfjsLib.getDocument({data:u,isEvalSupported:false}).promise;let s="";
+    for(let p=1;p<=doc.numPages;p++){const c=await (await doc.getPage(p)).getTextContent();s+=c.items.map(x=>x.str+(x.hasEOL?"\\n":"")).join("")+"\\n";}
+    completion(s)}catch(e){completion("ERRORE "+e)}})()`, true);
+}
+
+async function portale(percorso, token, metodo, corpo) {
+  const r = new Request(PORTALE + percorso); r.timeoutInterval = 20;
+  r.headers = Object.assign({ Accept: "application/json" }, token ? { "X-Auth-Token": token } : {}, corpo ? { "Content-Type": "application/json" } : {});
+  if (metodo) r.method = metodo; if (corpo) r.body = JSON.stringify(corpo);
+  const j = await r.loadJSON();
+  if (r.response && r.response.statusCode >= 400) throw new Error("portale " + r.response.statusCode + " " + percorso);
+  return j;
+}
+
+// tutti gli oggetti dentro una risposta JSON (alberi di cartelle, liste annidate)
+function oggetti(x, out) { out = out || []; if (Array.isArray(x)) x.forEach(y => oggetti(y, out)); else if (x && typeof x === "object") { out.push(x); Object.values(x).forEach(y => { if (y && typeof y === "object") oggetti(y, out); }); } return out; }
+
+async function credenziali(chiedi) {
+  if (!chiedi && Keychain.contains(KC_CF) && Keychain.contains(KC_PW)) return [Keychain.get(KC_CF), Keychain.get(KC_PW)];
+  if (config.runsInWidget) return null;
+  const a = new Alert(); a.title = "Portale del lavoro"; a.message = "Codice fiscale e password del portale PubblicaWeb. Restano solo nel Portachiavi di questo iPhone.";
+  a.addTextField("Codice fiscale", Keychain.contains(KC_CF) ? Keychain.get(KC_CF) : ""); a.addSecureTextField("Password", "");
+  a.addAction("Salva"); a.addCancelAction("Non ora");
+  if (await a.presentAlert() < 0) return null;
+  const cf = a.textFieldValue(0).trim().toUpperCase(), pw = a.textFieldValue(1);
+  if (!cf || !pw) return null;
+  Keychain.set(KC_CF, cf); Keychain.set(KC_PW, pw); return [cf, pw];
+}
+
+// giorni di ferie: dalla cache (aggiornata al massimo ogni 6 ore); i PDF già letti non si riscaricano
+async function caricaFerie() {
+  const fc = fm.joinPath(fm.documentsDirectory(), "ledwall-ferie.json");
+  let c = { agg: 0, doc: {} };
+  try { if (fm.fileExists(fc)) c = JSON.parse(fm.readString(fc)); } catch (e) {}
+  const giorni = () => [...new Set(Object.values(c.doc).flatMap(x => x.date || []))];
+  if (Date.now() - (c.agg || 0) < 6 * 3600e3 && !(!config.runsInWidget && c.errore)) return giorni();
+  try {
+    let cr = await credenziali(false); if (!cr) return giorni();
+    let login = await portale("/api/v1/account", null, "POST", { username: cr[0], password: cr[1], twoFactorEnabled: false }).catch(() => null);
+    if ((!login || !login.AuthToken) && !config.runsInWidget && (cr = await credenziali(true))) login = await portale("/api/v1/account", null, "POST", { username: cr[0], password: cr[1], twoFactorEnabled: false }).catch(() => null);
+    if (!login || !login.AuthToken) throw new Error("accesso al portale non riuscito");
+    if (login.OtpRequired) throw new Error("il portale chiede il codice OTP");
+    const tk = login.AuthToken;
+    const repo = oggetti(await portale("/api/v2/repositories", tk)).filter(x => x.Id != null);
+    const docs = {};
+    for (const rp of repo) {
+      const percorsi = new Set(["/"]);
+      try { oggetti(await portale("/api/v3/Folders/GetTree?repositoryId=" + rp.Id + "&path=%2F&unread=true", tk)).forEach(o => { const p = (o.data && o.data.path) || o.path || o.Path; if (typeof p === "string") percorsi.add(p.startsWith("/") ? p : "/" + p); }); } catch (e) {}
+      for (const p of percorsi) {
+        let l; try { l = await portale("/api/v1/Documents?repositoryId=" + rp.Id + "&path=" + encodeURIComponent(p), tk); } catch (e) { continue; }
+        oggetti(l).filter(o => o.Id != null && typeof (o.Name || o.FileName) === "string").forEach(o => docs[o.Id] = o.Name || o.FileName);
+      }
+    }
+    for (const [id, nome] of Object.entries(docs)) {
+      if (!eDiFerie(nome) || (c.doc[id] && c.doc[id].date)) continue;
+      const r = new Request(PORTALE + "/api/v1/DocumentDownload?Id=" + encodeURIComponent(id)); r.headers = { "X-Auth-Token": tk }; r.timeoutInterval = 30;
+      let dati = await r.load();
+      // se il portale risponde con il link firmato invece del file, scarico il PDF da lì
+      if (!dati.toRawString || !String(dati.toRawString() || "").startsWith("%PDF")) { const u = (String(dati.toRawString() || "").match(/https:[^"\s]+/) || [])[0]; if (u) dati = await new Request(u.replace(/\\u0026/g, "&")).load(); }
+      const testo = String(await testoPdf(dati));
+      if (testo.startsWith("ERRORE")) throw new Error(nome + ": " + testo);
+      // l'intestazione del comunicato dice a chi è rivolto (es. "SUPERFICI, PROFILI, MONTAGGIO ... (Produzione e Uffici)")
+      c.doc[id] = { nome, date: perMe(testo.slice(0, 500)) ? dateFerie(testo, nome) : [] };
+    }
+    try { await portale("/api/v1/account/logout?authToken=" + encodeURIComponent(tk), tk, "DELETE"); } catch (e) {}
+    c.agg = Date.now(); c.errore = null;
+  } catch (e) { c.errore = String(e && e.message || e); c.agg = Date.now() - 5 * 3600e3; } // riprova fra un'ora
+  fm.writeString(fc, JSON.stringify(c));
+  if (!config.runsInWidget) console.log("Ferie dal portale: " + (c.errore ? "ERRORE " + c.errore : Object.values(c.doc).map(x => x.nome + " → " + x.date.join(", ")).join("\n")));
+  return giorni();
+}
+
+// sostituisce i turni con "Ferie" nei giorni di ferie: il turno viene spezzato e al suo posto c'è una barra "Ferie"
+function applicaFerie(lav, ferie) {
+  if (!ferie.length) return lav;
+  const F = new Set(ferie), g0 = s => new Date(s + "T00:00"), dopo = s => { const x = new Date(s + "T12:00"); x.setDate(x.getDate() + 1); return ds(x); };
+  const out = [];
+  lav.forEach(l => {
+    if (!l.all) { if (!F.has(ds(l.s))) out.push(l); return; }
+    let s = ds(l.s), fine = ds(new Date(l.e.getTime() - 1)), da = null;
+    for (; s <= fine; s = dopo(s)) {
+      if (!F.has(s)) { if (!da) da = s; }
+      else if (da) { out.push(Object.assign({}, l, { s: g0(da), e: g0(s) })); da = null; }
+    }
+    if (da) out.push(Object.assign({}, l, { s: g0(da), e: g0(dopo(fine)) }));
+  });
+  // una barra "Ferie" per ogni periodo di giorni consecutivi
+  const ord = [...F].sort(); let i = 0;
+  while (i < ord.length) { let j = i; while (j + 1 < ord.length && ord[j + 1] === dopo(ord[j])) j++; out.push({ s: g0(ord[i]), e: g0(dopo(ord[j])), all: true, t: "Ferie", cal: "Ferie", col: { hex: "30d158" }, ferie: true }); i = j + 1; }
+  return out;
+}
+if (typeof LAVORO !== "undefined" && LAVORO) try { lavoro = applicaFerie(lavoro, await caricaFerie()); } catch (e) {}
 // un turno può durare più giorni (es. Mattina da lunedì a venerdì): lo segno su ogni giorno lun-ven del periodo
 const fineGiorno = l => ds(l.all ? new Date(l.e.getTime() - 1) : l.e);
 const lavOn = s => { const g = new Date(s + "T12:00").getDay(); if (g === 0 || g === 6) return []; return lavoro.filter(l => ds(l.s) <= s && s <= fineGiorno(l)); };
 // orari: dall'evento se ha un orario, altrimenti quelli standard del turno
-const ORE = { mattina: "6–14", mattino: "6–14", pomeriggio: "14–22", notte: "22–6" };
+const ORE = { mattina: "6–14", mattino: "6–14", pomeriggio: "14–22", notte: "22–6", ferie: "" };
 const corto = x => x.replace(":00", "");
 const orario = l => (!l.all && ds(l.s) === ds(l.e)) ? corto(hm(l.s)) + "–" + corto(hm(l.e)) : (!l.all ? corto(hm(l.s)) + "–" + corto(hm(l.e)) : (ORE[(l.cal || "").trim().toLowerCase()] || ""));
 const lavTxt = l => orario(l) || (l.cal || l.t || "Lavoro");
 // inizio e fine reali del turno (per gli eventi "tutto il giorno" uso gli orari standard del turno)
-const ORE_H = { mattina: [6, 14], mattino: [6, 14], pomeriggio: [14, 22], notte: [22, 6] };
+const ORE_H = { mattina: [6, 14], mattino: [6, 14], pomeriggio: [14, 22], notte: [22, 6], ferie: [0, 24] };
 function intervallo(l) {
   if (!l.all) return [l.s, l.e];
   const h = ORE_H[(l.cal || "").trim().toLowerCase()] || [8, 17];
@@ -244,7 +406,7 @@ if (mode.toLowerCase().startsWith("task")) {
     else { [nx.mattina, nx.sera].forEach((n, i) => { const s = r.addStack(); s.layoutVertically(); const im = s.addImage(circle(n, 34)); im.imageSize = new Size(34, 34); txt(s, (i ? "🌙 " : "☀️ ") + first(n), Font.systemFont(10)); r.addSpacer(8); }); }
   }
   let pg = null, pl = null; for (let i = 0; i < 21 && !pl; i++) { const x = new Date(); x.setDate(x.getDate() + i); const l = lavOn(ds(x))[0]; if (l) { pg = x; pl = l; } }
-  if (pl) { w.addSpacer(8); const g = ds(pg) === today ? "Oggi" : pg.toLocaleDateString("it-IT", { weekday: "short", day: "numeric" }); txt(w, "💼 " + g + " · " + (pl.cal || "Lavoro"), Font.semiboldSystemFont(11), new Color(pl.col ? pl.col.hex : "#ff9f0a")); if (orario(pl)) txt(w, orario(pl), Font.systemFont(10), MUT); }
+  if (pl) { w.addSpacer(8); const g = ds(pg) === today ? "Oggi" : pg.toLocaleDateString("it-IT", { weekday: "short", day: "numeric" }); txt(w, (pl.ferie ? "🌴 " : "💼 ") + g + " · " + (pl.cal || "Lavoro"), Font.semiboldSystemFont(11), new Color(pl.col ? pl.col.hex : "#ff9f0a")); if (orario(pl)) txt(w, orario(pl), Font.systemFont(10), MUT); }
 } else {
   // calendario a griglia: large = mese intero (+ giorni fino alla domenica dopo), medium = settimana corrente e successiva
   const now = new Date(); const y = now.getFullYear(), mo = now.getMonth();
