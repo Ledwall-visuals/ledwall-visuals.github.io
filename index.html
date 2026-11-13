@@ -1353,7 +1353,7 @@ const MIO = "${MIOTOK||''}";
 const CODE_URL = "https://api.github.com/repos/Ledwall-visuals/ledwall-visuals.github.io/contents/widget.js";
 const fm = FileManager.local(), f = fm.joinPath(fm.documentsDirectory(), "ledwall-widget.js");
 let code;
-try { const rq = new Request(CODE_URL); rq.headers = { Accept: "application/vnd.github.raw" }; code = await rq.loadString(); if (!code.includes("ListWidget")) throw 0; fm.writeString(f, code); }
+try { const rq = new Request(CODE_URL); rq.headers = { Accept: "application/vnd.github.raw" }; rq.timeoutInterval = 6; code = await rq.loadString(); if (!code.includes("ListWidget") || !code.includes("// FINE widget.js")) throw 0; fm.writeString(f, code); }
 catch (e) { code = fm.fileExists(f) ? fm.readString(f) : ""; }
 await eval("(async () => {" + code + "\\n})()");
 Script.complete();

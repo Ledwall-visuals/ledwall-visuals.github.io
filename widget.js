@@ -4,9 +4,20 @@ const FEED = "https://rliekssnvssbpkjzpash.supabase.co/functions/v1/feed?f=json&
 const SITO = "https://ledwall-visuals.github.io/";
 const fm = FileManager.local();
 const cache = fm.joinPath(fm.documentsDirectory(), "ledwall-cache.json");
-let d;
-try { d = await new Request(FEED).loadJSON(); fm.writeString(cache, JSON.stringify(d)); }
-catch (e) { d = fm.fileExists(cache) ? JSON.parse(fm.readString(cache)) : { persone: [], turni: [], eventi: [], task: [], checklist: [], oggi: new Date().toISOString().slice(0, 10) }; }
+// scarico il feed; salvo in cache solo una risposta valida (un errore del server non deve sovrascrivere i dati buoni)
+let d, daCache = false;
+try {
+  const rq = new Request(FEED); rq.timeoutInterval = 8;
+  const x = await rq.loadJSON();
+  if (rq.response.statusCode !== 200 || !x || !Array.isArray(x.turni)) throw new Error("feed " + rq.response.statusCode);
+  x._agg = Date.now(); d = x; fm.writeString(cache, JSON.stringify(d));
+} catch (e) {
+  daCache = true;
+  try { d = fm.fileExists(cache) ? JSON.parse(fm.readString(cache)) : {}; } catch (e2) { d = {}; }
+}
+["persone", "turni", "eventi", "task", "checklist"].forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
+// se i dati vengono dalla cache, nell'intestazione compare "⚠︎" con l'ora dell'ultimo aggiornamento riuscito
+const vecchio = daCache ? "⚠︎" + (d._agg ? " " + new Date(d._agg).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "") : "";
 
 const fam = config.widgetFamily || "large";
 const PARAM = String(args.widgetParameter || "").split(";")[0].trim();
@@ -235,7 +246,7 @@ if (mode.toLowerCase().startsWith("task")) {
   }
 } else if (fam === "small") {
   // prossima domenica
-  txt(w, "⛪ Prossima domenica", Font.boldSystemFont(11), ACC); w.addSpacer(4);
+  txt(w, "⛪ Prossima domenica" + (vecchio ? " " + vecchio : ""), Font.boldSystemFont(11), ACC); w.addSpacer(4);
   if (nx) {
     txt(w, new Date(nx.data + "T12:00").toLocaleDateString("it-IT", { day: "numeric", month: "long" }), Font.systemFont(12), MUT);
     w.addSpacer(8);
@@ -262,7 +273,9 @@ if (mode.toLowerCase().startsWith("task")) {
   }
   const head = w.addStack(); head.centerAlignContent();
   const mn = now.toLocaleDateString("it-IT", { month: "long", year: "numeric" });
-  txt(head, mn.charAt(0).toUpperCase() + mn.slice(1), Font.boldSystemFont(14)); head.addSpacer();
+  txt(head, mn.charAt(0).toUpperCase() + mn.slice(1), Font.boldSystemFont(14));
+  if (vecchio) { head.addSpacer(6); txt(head, vecchio, Font.systemFont(10), new Color("#ff9f0a")); }
+  head.addSpacer();
   if (nx) { txt(head, "⛪ " + new Date(nx.data + "T12:00").toLocaleDateString("it-IT", { day: "numeric", month: "short" }) + " · ", Font.systemFont(11), MUT); txt(head, nxNome, Font.boldSystemFont(11), nx.mattina && pers[nx.mattina] ? new Color(pers[nx.mattina].colore) : ACC); }
   else txt(head, "⛪ Ledwall", Font.systemFont(11), MUT);
   w.addSpacer(6);
@@ -306,3 +319,4 @@ w.addSpacer();
 w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
 if (config.runsInWidget) Script.setWidget(w);
 else if (fam === "small") await w.presentSmall(); else if (fam === "medium") await w.presentMedium(); else await w.presentLarge();
+// FINE widget.js (il loader controlla questa riga per non usare un download troncato)
