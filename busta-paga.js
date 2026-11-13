@@ -176,7 +176,7 @@ const delta = (s, f) => {
 const voce = (s, k, v, col) => { const r = s.addStack(); r.centerAlignContent(); txt(r, k, Font.systemFont(10), MUT); r.addSpacer(); txt(r, v, Font.semiboldSystemFont(10), col || TX); };
 
 const w = new ListWidget();
-w.backgroundColor = BG; w.url = PORTALE + "?spa_disabled=true"; // toccando il widget si apre il portale w.setPadding(12, 14, 12, 14);
+w.backgroundColor = BG; w.url = PORTALE + "?spa_disabled=true"; w.setPadding(12, 14, 12, 14); // toccando il widget si apre il portale
 const h = w.addStack(); h.centerAlignContent();
 txt(h, "💶 Busta paga", Font.boldSystemFont(12), ACC); h.addSpacer();
 if (ult) txt(h, nomeMese(ult.mese, true), Font.systemFont(11), MUT);
