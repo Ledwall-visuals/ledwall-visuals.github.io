@@ -150,9 +150,11 @@ async function caricaFerie() {
   if (Date.now() - (c.agg || 0) < 6 * 3600e3 && !(!config.runsInWidget && c.errore)) return giorni();
   try {
     let cr = await credenziali(false); if (!cr) return giorni();
-    let login = await portale("/api/v1/account", null, "POST", { username: cr[0], password: cr[1], twoFactorEnabled: false }).catch(() => null);
-    if ((!login || !login.AuthToken) && !config.runsInWidget && (cr = await credenziali(true))) login = await portale("/api/v1/account", null, "POST", { username: cr[0], password: cr[1], twoFactorEnabled: false }).catch(() => null);
-    if (!login || !login.AuthToken) throw new Error("accesso al portale non riuscito");
+    // il portale risponde 401 con { Message: "Nome utente o password errati..." }: lo mostro così com'è
+    const accedi = async c => { const r = new Request(PORTALE + "/api/v1/account"); r.method = "POST"; r.timeoutInterval = 20; r.headers = { "Content-Type": "application/json", Accept: "application/json" }; r.body = JSON.stringify({ username: c[0], password: c[1], twoFactorEnabled: false }); try { return await r.loadJSON(); } catch (e) { return { Message: "risposta non valida dal portale (" + ((r.response && r.response.statusCode) || "rete") + ")" }; } };
+    let login = await accedi(cr);
+    if ((!login || !login.AuthToken) && !config.runsInWidget && (cr = await credenziali(true))) login = await accedi(cr);
+    if (!login || !login.AuthToken) throw new Error("accesso al portale non riuscito: " + ((login && login.Message) || "nessuna risposta"));
     if (login.OtpRequired) throw new Error("il portale chiede il codice OTP");
     const tk = login.AuthToken;
     const repo = oggetti(await portale("/api/v2/repositories", tk)).filter(x => x.Id != null);

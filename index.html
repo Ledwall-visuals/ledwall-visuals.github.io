@@ -897,8 +897,9 @@ async function testoPdfB(buf){await caricaPdfJs();const doc=await pdfjsLib.getDo
 async function aggiornaFerie(cf,pw){
   FERIE_STATO='Lettura in corso…';render();
   try{
-    const login=await portaleJ('/api/v1/account',null,'POST',{username:cf,password:pw,twoFactorEnabled:false}).catch(()=>null);
-    if(!login||!login.AuthToken)throw new Error('Accesso non riuscito: controlla codice fiscale e password');
+    const rl=await fetch(PORTALE+'/api/v1/account',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({username:cf,password:pw,twoFactorEnabled:false})}).catch(()=>null);
+    const login=rl?await rl.json().catch(()=>null):null;
+    if(!login||!login.AuthToken)throw new Error('Accesso non riuscito: '+((login&&login.Message)||(rl?'errore '+rl.status:'portale non raggiungibile')));
     if(login.OtpRequired)throw new Error('Il portale chiede il codice OTP');
     const tk=login.AuthToken, docs={};
     for(const rp of oggettiJ(await portaleJ('/api/v2/repositories',tk)).filter(x=>x.Id!=null)){
