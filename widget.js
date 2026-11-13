@@ -48,8 +48,9 @@ if (typeof LAVORO !== "undefined" && LAVORO) try {
 // La prima volta va avviato dall'app Scriptable: chiede codice fiscale e password.
 const PORTALE = "https://pubblicazione.dataservices.it/pubblicaweb/studiopaladin";
 const KC_CF = "portale-lavoro-cf", KC_PW = "portale-lavoro-pw";
-const MIO_REPARTO = (typeof REPARTO !== "undefined" && REPARTO ? REPARTO : "Produzione").toLowerCase();
-const REPARTI = ["produzione", "uffici", "ufficio", "magazzino", "logistica", "amministrazione", "commerciale"];
+// il mio reparto e la mia linea (Produzione, Superfici, linea Bos5); nel loader si possono cambiare con const REPARTO = "a, b, c"
+const MIEI = String(typeof REPARTO !== "undefined" && REPARTO ? REPARTO : "Produzione, Superfici, Bos5").toLowerCase().split(",").map(x => x.trim().replace(/\s+/g, "")).filter(Boolean);
+const ALTRI = ["uffici", "ufficio", "magazzino", "logistica", "amministrazione", "commerciale", "profili", "montaggio", "tamburato"];
 const MESI = { gennaio: 0, febbraio: 1, marzo: 2, aprile: 3, maggio: 4, giugno: 5, luglio: 6, agosto: 7, settembre: 8, ottobre: 9, novembre: 10, dicembre: 11 };
 const RE_MESE = "(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)";
 const isoG = (y, m, g) => y + "-" + String(m + 1).padStart(2, "0") + "-" + String(g).padStart(2, "0");
@@ -95,13 +96,14 @@ function dateFerie(testo, nome, oggi) {
   return [...out].sort();
 }
 
-// solo i comunicati di ferie/chiusure, e se il nome indica un reparto, solo il mio
-function eDiFerie(nome) {
-  const n = String(nome || "").toLowerCase();
-  if (!/ferie|chiusur/.test(n)) return false;
-  const rep = REPARTI.filter(r => n.includes(r));
-  return !rep.length || rep.some(r => r.startsWith(MIO_REPARTO.slice(0, 6)) || MIO_REPARTO.startsWith(r.slice(0, 6)));
+// è per me? sì se cita il mio reparto o la mia linea, no se cita solo altri reparti, sì se non ne cita nessuno
+function perMe(testo) {
+  const n = String(testo || "").toLowerCase(), compatto = n.replace(/\s+/g, "");
+  if (MIEI.some(r => compatto.includes(r))) return true;
+  return !ALTRI.some(r => new RegExp("\\b" + r + "\\b").test(n));
 }
+// solo i comunicati di ferie/chiusure, e se il nome indica un reparto, solo il mio
+function eDiFerie(nome) { return /ferie|chiusur/i.test(String(nome || "")) && perMe(nome); }
 
 // testo del PDF con pdf.js dentro un WebView (Scriptable non sa leggere i PDF da solo)
 async function testoPdf(dati) {
@@ -171,7 +173,8 @@ async function caricaFerie() {
       if (!dati.toRawString || !String(dati.toRawString() || "").startsWith("%PDF")) { const u = (String(dati.toRawString() || "").match(/https:[^"\s]+/) || [])[0]; if (u) dati = await new Request(u.replace(/\\u0026/g, "&")).load(); }
       const testo = String(await testoPdf(dati));
       if (testo.startsWith("ERRORE")) throw new Error(nome + ": " + testo);
-      c.doc[id] = { nome, date: dateFerie(testo, nome) };
+      // l'intestazione del comunicato dice a chi è rivolto (es. "SUPERFICI, PROFILI, MONTAGGIO ... (Produzione e Uffici)")
+      c.doc[id] = { nome, date: perMe(testo.slice(0, 500)) ? dateFerie(testo, nome) : [] };
     }
     try { await portale("/api/v1/account/logout?authToken=" + encodeURIComponent(tk), tk, "DELETE"); } catch (e) {}
     c.agg = Date.now(); c.errore = null;
