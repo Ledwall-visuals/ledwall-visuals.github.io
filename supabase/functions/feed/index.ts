@@ -40,6 +40,20 @@ Deno.serve(async (req) => {
   const t = url.searchParams.get("t") || "";
   const { data: tok } = await sb.from("feed_token").select("token").eq("id", 1).single();
   if (!tok || t !== tok.token) return new Response("Non autorizzato", { status: 401 });
+  // POST &azione=lavoro dal widget di chi ha LAVORO=true: salva turni di lavoro e ferie nella sua riga privata
+  if (req.method === "POST" && url.searchParams.get("azione") === "lavoro") {
+    const u0 = url.searchParams.get("u") || "";
+    if (!/^[0-9a-f]{32}$/.test(u0)) return new Response("Token personale mancante", { status: 401 });
+    const { data: tp0 } = await sb.from("token_personale").select("user_id").eq("token", u0).maybeSingle();
+    if (!tp0?.user_id) return new Response("Non autorizzato", { status: 401 });
+    const b = await req.json().catch(() => null) as any;
+    if (!b || !Array.isArray(b.lavoro) || !Array.isArray(b.ferie) || b.lavoro.length > 400 || b.ferie.length > 400) return new Response("Dati non validi", { status: 400 });
+    const s = (x: unknown, n: number) => String(x ?? "").slice(0, n);
+    const lavoro = b.lavoro.map((l: any) => ({ s: s(l.s, 40), e: s(l.e, 40), all: !!l.all, cal: s(l.cal, 40), col: l.col ? s(l.col, 9) : null }));
+    const ferie = b.ferie.map((d: any) => s(d, 10)).filter((d: string) => /^\d{4}-\d\d-\d\d$/.test(d));
+    const { error } = await sb.from("lavoro_personale").upsert({ user_id: tp0.user_id, dati: { lavoro, ferie }, agg: new Date().toISOString() });
+    return new Response(error ? "Errore" : "ok", { status: error ? 500 : 200 });
+  }
   const { data: row } = await sb.from("condiviso").select("data").eq("id", "main").maybeSingle();
   const DB = (row?.data || {}) as any;
   // task e to-do list: solo quelle comuni (il link del feed è condiviso nel team)

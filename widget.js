@@ -199,11 +199,28 @@ function applicaFerie(lav, ferie) {
     if (da) out.push(Object.assign({}, l, { s: g0(da), e: g0(dopo(fine)) }));
   });
   // una barra "Ferie" per ogni periodo di giorni consecutivi
-  const ord = [...F].sort(); let i = 0;
+  // sabato e domenica non serve segnarli come ferie
+  const ord = [...F].filter(x => { const g = new Date(x + "T12:00").getDay(); return g !== 0 && g !== 6; }).sort(); let i = 0;
   while (i < ord.length) { let j = i; while (j + 1 < ord.length && ord[j + 1] === dopo(ord[j])) j++; out.push({ s: g0(ord[i]), e: g0(dopo(ord[j])), all: true, t: "Ferie", cal: "Ferie", col: { hex: "30d158" }, ferie: true }); i = j + 1; }
   return out;
 }
-if (typeof LAVORO !== "undefined" && LAVORO) try { lavoro = applicaFerie(lavoro, await caricaFerie()); } catch (e) {}
+// turni e ferie inviati al gestionale (tabella privata, li vede solo il proprietario del token personale MIO)
+async function inviaLavoro(lav, ferie) {
+  if (typeof MIO === "undefined" || !MIO) return;
+  const dati = { lavoro: lav.map(l => ({ s: l.s.toISOString(), e: l.e.toISOString(), all: !!l.all, cal: l.cal || "", col: l.col && l.col.hex ? l.col.hex : null })), ferie };
+  const fi = fm.joinPath(fm.documentsDirectory(), "ledwall-lavoro-inviato.json"), js = JSON.stringify(dati);
+  let prima = {}; try { if (fm.fileExists(fi)) prima = JSON.parse(fm.readString(fi)); } catch (e) {}
+  if (prima.js === js && Date.now() - (prima.t || 0) < 6 * 3600e3) return;
+  const r = new Request(FEED + "&azione=lavoro"); r.method = "POST"; r.timeoutInterval = 15;
+  r.headers = { "Content-Type": "application/json" }; r.body = js;
+  await r.loadString();
+  if (r.response && r.response.statusCode === 200) fm.writeString(fi, JSON.stringify({ js, t: Date.now() }));
+}
+if (typeof LAVORO !== "undefined" && LAVORO) try {
+  let fer = []; try { fer = await caricaFerie(); } catch (e) {}
+  try { await inviaLavoro(lavoro, fer); } catch (e) {}
+  lavoro = applicaFerie(lavoro, fer);
+} catch (e) {}
 // un turno può durare più giorni (es. Mattina da lunedì a venerdì): lo segno su ogni giorno lun-ven del periodo
 const fineGiorno = l => ds(l.all ? new Date(l.e.getTime() - 1) : l.e);
 const lavOn = s => { const g = new Date(s + "T12:00").getDay(); if (g === 0 || g === 6) return []; return lavoro.filter(l => ds(l.s) <= s && s <= fineGiorno(l)); };

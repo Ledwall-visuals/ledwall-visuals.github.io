@@ -142,10 +142,11 @@ th,td{border-bottom:.5px solid var(--line)}
 .calcell.today{outline:0;background:none}
 .calcell.today .cnum{background:var(--bad);color:#fff;font-weight:600}
 .calcell .dav{margin:2px auto 0}
-.chip.ferie{background:#30d15833;color:#30d158;cursor:default;border-radius:6px;text-align:center;letter-spacing:.04em;text-transform:uppercase;font-weight:700;position:relative}
 .calcell.fe{overflow:visible}
-.chip.ferie.fn{margin-right:-7px;border-top-right-radius:0;border-bottom-right-radius:0}
-.chip.ferie.fp{margin-left:-2px;border-top-left-radius:0;border-bottom-left-radius:0}
+.lrow{position:relative;height:15px;margin-top:3px}
+.lbar{position:absolute;top:0;bottom:0;border-radius:5px;overflow:visible;white-space:nowrap;font-size:9px;font-weight:800;letter-spacing:.05em;line-height:15px;color:#fff;padding-left:4px;text-align:left;text-transform:uppercase}
+.lbar.fp{border-top-left-radius:0;border-bottom-left-radius:0}.lbar.fn{border-top-right-radius:0;border-bottom-right-radius:0}
+.lbar span{position:relative;z-index:1}
 .chip{background:#0a84ff33;color:#64b5ff;border-radius:4px;padding:1px 4px;margin-top:2px;font-size:11px;font-weight:600;text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .dav{box-shadow:none}
 #toast{background:#2c2c2ef2;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border:0;border-radius:14px;padding:12px 18px;font-weight:500;font-size:15px;bottom:calc(90px + env(safe-area-inset-bottom))}
@@ -557,7 +558,7 @@ async function start(){
   const {data:{session}}=await sb.auth.getSession();
   if(!session){showLogin();return}
   USER=session.user; try{const {data:rs}=await sb.auth.refreshSession();if(rs&&rs.user)USER=rs.user}catch(e){} try{const tm=USER.user_metadata&&USER.user_metadata.tema;if(tm&&!localStorage.getItem('ledwall-tema')){localStorage.setItem('ledwall-tema',applicaTema(tm))}}catch(e){} document.getElementById('logout').style.display='';document.getElementById('pwbtn').style.display='';
-  await pull(); loadBlocchi(); loadAtt(); startRealtime();
+  await pull(); loadBlocchi(); loadAtt(); loadLavoro(); startRealtime();
 }
 document.getElementById('loginForm').onsubmit=async e=>{e.preventDefault();
   if(!sb)return; document.getElementById('lErr').textContent='Accesso…';
@@ -849,15 +850,12 @@ document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest
 function vCal(){
   const base=new Date(); base.setDate(1); base.setMonth(base.getMonth()+CALOFF); const oggi=new Date().toISOString().slice(0,10);
   const y=base.getFullYear(),mo=base.getMonth(),days=new Date(y,mo+1,0).getDate(),off=(base.getDay()+6)%7;
-  const FG=mieFerie()?ferieGiorni():new Set();
+  const LB=mieFerie()?barreLavoro():[];
   const cell=(d,extra)=>{const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const evs=isAdmin()?DB.events.filter(e=>e.id!=='chiesa'&&e.start&&e.start<=ds&&ds<=(e.end||e.start)):[];
     const tu=isSunday(ds)?davDay(ds):'';
     const tk=taskAperti().filter(x=>x.scadenza===ds).length;
-    // ferie come una barra unica sui giorni consecutivi della stessa settimana: angoli tondi solo all'inizio e alla fine
-    const ieri=new Date(d.getFullYear(),d.getMonth(),d.getDate()-1),dom=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1),g=(d.getDay()+6)%7,iso=x=>`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
-    const fP=g>0&&FG.has(iso(ieri)),fN=g<6&&FG.has(iso(dom));
-    const fe=FG.has(ds)?`<div class="chip ferie${fP?' fp':''}${fN?' fn':''}" title="Ferie (dal portale del lavoro)">${fP?'&nbsp;':'Ferie'}</div>`:'';
+    const fe=LB.length?barreGiorno(LB,d,!extra&&d.getDate()===1):'';
     return `<div class="calcell${ds===oggi?' today':''}${isSunday(ds)?' dom':''}${fe?' fe':''}"${extra?' style="opacity:.35"':''}><div><span class="cnum">${d.getDate()}</span>${extra&&d.getDate()===1?'<span class="mut"> '+d.toLocaleDateString('it-IT',{month:'short'})+'</span>':''}${tk?` <span title="${tk} task in scadenza" style="font-size:11px">✅${tk>1?tk:''}</span>`:''}</div>${fe}${tu}${evs.map(e=>`<div class="chip" data-open="${e.id}">${esc(e.name||'Evento')}</div>`).join('')}</div>`};
   let h=`<div class="card"><div class="row" style="margin-bottom:10px;flex-wrap:nowrap"><button class="btn sec sm" data-calm="-1" aria-label="Mese precedente">‹</button><h2 style="text-transform:capitalize;margin:0;flex:1;text-align:center">${base.toLocaleDateString('it-IT',{month:'long',year:'numeric'})}</h2>${CALOFF?'<button class="btn sec sm" data-calm="0">Oggi</button>':''}<button class="btn sec sm" data-calm="1" aria-label="Mese successivo">›</button></div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px">`;
   ['L','M','M','G','V','S','D'].forEach(x=>h+=`<div class="mut" style="text-align:center;font-size:11px;font-weight:600;letter-spacing:.06em">${x}</div>`);
@@ -876,12 +874,45 @@ const PORTALE='https://pubblicazione.dataservices.it/pubblicaweb/studiopaladin',
 function mieFerie(){return !!(USER&&USER.id===CHIESA_OWNER&&!ANTEPRIMA)}
 let FERIE=(()=>{try{return JSON.parse(localStorage.getItem(FKEY))||{agg:0,doc:{}}}catch(e){return {agg:0,doc:{}}}})(), FERIE_STATO='', FERIE_FORM=false;
 const ferieGiorni=()=>new Set(Object.values(FERIE.doc||{}).flatMap(x=>x.date||[]));
+// turni di lavoro (calendari Mattina/Pomeriggio/Notte dell'iPhone) inviati dal widget: tabella privata lavoro_personale
+let LAVORO_SITO=null;
+async function loadLavoro(){if(!USER||!sb||USER.id!==CHIESA_OWNER)return;const {data,error}=await sb.from('lavoro_personale').select('dati,agg').maybeSingle();if(error){console.error(error);return}
+  LAVORO_SITO=data||null;if(!curEv&&view==='calendario'&&!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#app')))render()}
+const ORE_LAV={mattina:[6,14],mattino:[6,14],pomeriggio:[14,22],notte:[22,6],ferie:[0,24]};
+const isoL=x=>`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+// barre come nel widget: turni dal widget, spezzati nei giorni di ferie, più una barra "Ferie" per ogni periodo
+function barreLavoro(){
+  const F=new Set([...ferieGiorni(),...((LAVORO_SITO&&LAVORO_SITO.dati&&LAVORO_SITO.dati.ferie)||[])]);
+  const g0=s=>new Date(s+'T00:00'),dopo=s=>{const x=new Date(s+'T12:00');x.setDate(x.getDate()+1);return isoL(x)};
+  const lav=((LAVORO_SITO&&LAVORO_SITO.dati&&LAVORO_SITO.dati.lavoro)||[]).map(l=>({s:new Date(l.s),e:new Date(l.e),all:!!l.all,cal:l.cal||'Lavoro',col:l.col}));
+  const out=[];
+  lav.forEach(l=>{
+    if(!l.all){if(!F.has(isoL(l.s)))out.push(l);return}
+    let s=isoL(l.s),fine=isoL(new Date(l.e.getTime()-1)),da=null;
+    for(;s<=fine;s=dopo(s)){if(!F.has(s)){if(!da)da=s}else if(da){out.push(Object.assign({},l,{s:g0(da),e:g0(s)}));da=null}}
+    if(da)out.push(Object.assign({},l,{s:g0(da),e:g0(dopo(fine))}));
+  });
+  const ord=[...F].filter(x=>{const g=new Date(x+'T12:00').getDay();return g!==0&&g!==6}).sort();let i=0; // niente ferie di sabato e domenica
+  while(i<ord.length){let j=i;while(j+1<ord.length&&ord[j+1]===dopo(ord[j]))j++;out.push({s:g0(ord[i]),e:g0(dopo(ord[j])),all:true,cal:'Ferie',col:'30d158'});i=j+1}
+  // inizio e fine reali (per gli eventi "tutto il giorno" gli orari standard del turno)
+  return out.map(l=>{if(!l.all)return Object.assign({a:l.s,b:l.e},l);const h=ORE_LAV[l.cal.trim().toLowerCase()]||[8,17];
+    const a=new Date(l.s);a.setHours(h[0],0,0,0);const b=new Date(l.e.getTime()-1);b.setHours(12,0,0,0);if(h[1]<=h[0])b.setDate(b.getDate()+1);b.setHours(h[1],0,0,0);return Object.assign({a,b},l)});
+}
+// pezzi di barra di un giorno: continuano nella cella accanto (stessa settimana), angoli tondi solo agli estremi
+function barreGiorno(LB,d,primo){
+  const d0=new Date(d.getFullYear(),d.getMonth(),d.getDate()),d1=new Date(d0);d1.setDate(d1.getDate()+1);const g=(d0.getDay()+6)%7,H=d1-d0;
+  const pezzi=LB.filter(l=>l.a<d1&&l.b>d0&&(l.b-l.a)>0).map(l=>{
+    const f0=Math.max(0,(l.a-d0)/H),f1=Math.min(1,(l.b-d0)/H),fp=l.a<d0&&g>0&&!primo,fn=l.b>d1&&g<6;if(f1-f0<0.02&&!fp&&!fn)return '';
+    const c='#'+String(l.col||'ff9f0a').replace('#','').slice(0,6);
+    return `<div class="lbar${fp?' fp':''}${fn?' fn':''}" style="left:calc(${(f0*100).toFixed(2)}% - ${fp?2:0}px);right:calc(${((1-f1)*100).toFixed(2)}% - ${fn?7:0}px);background:${c}d0" title="${esc(l.cal)}">${fp?'':`<span>${esc(l.cal)}</span>`}</div>`}).join('');
+  return pezzi?`<div class="lrow">${pezzi}</div>`:'';
+}
 const ferieCred=()=>{try{return JSON.parse(localStorage.getItem(FCRED))}catch(e){return null}};
 function ferieRiga(){
   const cr=ferieCred(), agg=FERIE.agg?new Date(FERIE.agg).toLocaleString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
   const n=Object.values(FERIE.doc||{}).filter(x=>(x.date||[]).length).length;
   const form=FERIE_FORM||(!cr&&!FERIE.agg)?`<div class="row" style="gap:8px;margin-top:8px"><input id="feCf" placeholder="Codice fiscale" autocomplete="username" value="${esc(cr&&cr.cf||'')}" style="flex:1;min-width:150px;text-transform:uppercase"><input id="fePw" type="password" placeholder="Password del portale" autocomplete="current-password" style="flex:1;min-width:150px"><label class="mut row" style="gap:4px"><input type="checkbox" id="feRic" style="width:auto;margin:0" ${cr||!FERIE.agg||FERIE_FORM?'checked':''}>Ricorda su questo dispositivo</label><button class="btn sm" data-ferie="login">Leggi le ferie</button></div>`:'';
-  return `<div style="margin-top:12px;padding-top:10px;border-top:1px solid #ffffff14"><div class="row" style="gap:8px"><span>🌴 <b>Ferie dal portale del lavoro</b></span><span class="mut">${FERIE_STATO||(FERIE.errore?'<span class="bad">'+esc(FERIE.errore)+'</span>':agg?`${n} comunicat${n===1?'o':'i'} · aggiornate ${agg}`:'')}</span><span class="sp"></span>${FERIE_STATO?'':`<button class="btn sec sm" data-ferie="${cr?'aggiorna':'form'}">${cr?'Aggiorna':'Accedi'}</button>`}</div>${form}<div class="mut" style="font-size:11px;margin-top:4px">Visibile solo a te.</div></div>`;
+  return `<div style="margin-top:12px;padding-top:10px;border-top:1px solid #ffffff14"><div class="row" style="gap:8px"><span>🌴 <b>Ferie dal portale del lavoro</b></span>${LAVORO_SITO?`<span class="mut">· turni dal widget ${new Date(LAVORO_SITO.agg).toLocaleString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</span>`:''}<span class="mut">${FERIE_STATO||(FERIE.errore?'<span class="bad">'+esc(FERIE.errore)+'</span>':agg?`${n} comunicat${n===1?'o':'i'} · aggiornate ${agg}`:'')}</span><span class="sp"></span>${FERIE_STATO?'':`<button class="btn sec sm" data-ferie="${cr?'aggiorna':'form'}">${cr?'Aggiorna':'Accedi'}</button>`}</div>${form}<div class="mut" style="font-size:11px;margin-top:4px">Visibile solo a te.</div></div>`;
 }
 async function portaleJ(percorso,tk,metodo,corpo){
   const r=await fetch(PORTALE+percorso,{method:metodo||'GET',headers:Object.assign({Accept:'application/json'},tk?{'X-Auth-Token':tk}:{},corpo?{'Content-Type':'application/json'}:{}),body:corpo?JSON.stringify(corpo):undefined});
