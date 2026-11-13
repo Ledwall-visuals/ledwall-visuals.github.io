@@ -36,10 +36,22 @@ async function credenziali(chiedi) {
 // accesso al portale: token e tutti i documenti di tutte le cartelle { Id: oggetto del portale }
 async function apriPortale() {
   let cr = await credenziali(false); if (!cr) return null;
-  const entra = c => portale("/api/v1/account", null, "POST", { username: c[0], password: c[1], twoFactorEnabled: false }).catch(() => null);
+  // il portale risponde sempre con JSON, anche con 401 ("Nome utente o password errati…"): tengo il messaggio
+  const entra = async c => {
+    const r = new Request(PORTALE + "/api/v1/account"); r.method = "POST"; r.timeoutInterval = 20;
+    r.headers = { Accept: "application/json", "Content-Type": "application/json" };
+    r.body = JSON.stringify({ username: c[0], password: c[1], twoFactorEnabled: false });
+    try { return await r.loadJSON(); } catch (e) { return { Message: "il portale non risponde (" + (e && e.message || e) + ")" }; }
+  };
   let login = await entra(cr);
-  if ((!login || !login.AuthToken) && !config.runsInWidget && (cr = await credenziali(true))) login = await entra(cr);
-  if (!login || !login.AuthToken) throw new Error("accesso al portale non riuscito");
+  // dall'app: se l'accesso non riesce mostro il motivo e faccio reinserire codice fiscale e password
+  while ((!login || !login.AuthToken) && !config.runsInWidget) {
+    const a = new Alert(); a.title = "Accesso al portale non riuscito"; a.message = String(login && login.Message || "Risposta vuota dal portale");
+    a.addAction("Reinserisci codice fiscale e password"); a.addCancelAction("Annulla");
+    if (await a.presentAlert() < 0 || !(cr = await credenziali(true))) break;
+    login = await entra(cr);
+  }
+  if (!login || !login.AuthToken) throw new Error("accesso al portale non riuscito: " + String(login && login.Message || "risposta vuota"));
   if (login.OtpRequired) throw new Error("il portale chiede il codice OTP");
   const tk = login.AuthToken;
   const repo = oggetti(await portale("/api/v2/repositories", tk)).filter(x => x.Id != null);
