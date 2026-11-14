@@ -1324,7 +1324,7 @@ function vChiesaRO(){const ev=DB.events.find(x=>x.id==='chiesa');
 
 document.addEventListener('click',async e=>{const b=e.target.closest&&e.target.closest('[data-v3d]');if(!b)return;
   b.disabled=true;const old=b.textContent;b.textContent='Carico il 3D…';
-  try{const m=await import('./chiesa3d.js?v=1');m.apri(b.dataset.v3d)}catch(err){console.error(err);toast('Non riesco a caricare la vista 3D')}finally{b.disabled=false;b.textContent=old}});
+  try{const m=await import('./chiesa3d.js?v=2');m.apri(b.dataset.v3d)}catch(err){console.error(err);toast('Non riesco a caricare la vista 3D')}finally{b.disabled=false;b.textContent=old}});
 
 function temaCard(){const t=document.documentElement.dataset.tema||'menta';const o=[['menta','🌿','Menta','chiaro, verde'],['glassy','🪟','Glassy','scuro, vetro'],['caldo','🍑','Caldo','vetro rosato'],['classico','🍎','Classico','scuro, Apple']];
   return `<div class="card"><h2>🎨 Stile del sito</h2><p class="mut" style="margin:0 0 12px">Vale solo su questo dispositivo: ognuno sceglie il suo.</p>
