@@ -43,16 +43,13 @@ export function apri(evId) {
 
   // ---- modello vero della sala (SketchUp dell'architetto, alleggerito) ----
   // Coordinate del modello in metri: ledwall sulla parete z = -27.7, da x 14.15 a 37.15, bordo alto a 4.5 m.
-  // la parete di fondo (di fronte al ledwall, a z ≈ 0) non si mostra: si taglia tutto quello che sta dietro z = -0.4
-  renderer.localClippingEnabled = true;
-  const tagliaFondo = new THREE.Plane(new THREE.Vector3(0, 0, -1), -0.4);
   const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
   loader.load('./chiesa3d.glb?v=1', g => {
     g.scene.traverse(o => {
       if (!o.isMesh) return;
       const ms = [].concat(o.material);
       if (ms.some(m => m.name === 'Sfondo ledwall')) { o.visible = false; return; }   // al suo posto mettiamo i moduli veri
-      ms.forEach(m => { m.clippingPlanes = [tagliaFondo]; m.metalness = 0; m.roughness = Math.max(0.6, m.roughness ?? 1); if (!o.geometry.attributes.normal) m.flatShading = true; });
+      ms.forEach(m => { m.metalness = 0; m.roughness = Math.max(0.6, m.roughness ?? 1); if (!o.geometry.attributes.normal) m.flatShading = true; });
     });
     scene.add(g.scene); caric.remove();
   }, ev => { if (ev.total) caric.textContent = `Carico il modello della chiesa… ${Math.round(ev.loaded / ev.total * 100)}%`; },
