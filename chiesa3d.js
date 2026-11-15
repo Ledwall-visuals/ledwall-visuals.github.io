@@ -15,7 +15,7 @@ export function apri(evId) {
   const box = document.createElement('div');
   box.id = 'v3d';
   box.innerHTML = `<div class="v3dbar"><b>🧊 Ledwall chiesa in 3D</b><span class="sp"></span>
-    <button class="btn sec sm" data-v3dvista="sala">Dal fondo</button><button class="btn sec sm" data-v3dvista="palco">Da metà sala</button><button class="btn sec sm" data-v3dvista="alto">Di lato</button>
+    <button class="btn sec sm" data-v3dvista="sala">Dal fondo</button><button class="btn sec sm" data-v3dvista="palco">Da metà sala</button><button class="btn sec sm" data-v3dvista="alto">Di lato</button><button class="btn sec sm" data-v3dvista="regia">Dalla regia</button>
     <label class="btn sec sm" style="margin:0">🖼 Prova un'immagine<input type="file" accept="image/*" hidden id="v3dimg"></label>
     <button class="btn sec sm" data-v3dpm="1">🎯 Pixelmap</button><button class="btn sm" data-v3dclose="1">✕ Chiudi</button></div>
     <div class="v3dhint mut">Trascina per girare, rotella o due dita per lo zoom. Modello vero della sala (progetto SketchUp), ledwall con la forma della configurazione.</div>`;
@@ -25,7 +25,7 @@ export function apri(evId) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(2, devicePixelRatio));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMapping = THREE.NoToneMapping;   // colori come in SketchUp, senza scurire
   box.appendChild(renderer.domElement);
   const caric = document.createElement('div'); caric.className = 'v3dload'; caric.textContent = 'Carico il modello della chiesa…';
   caric.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;pointer-events:none';
@@ -38,18 +38,41 @@ export function apri(evId) {
   controls.enableDamping = true; controls.minDistance = 0.5; controls.maxDistance = 45;
 
   // ---- luci ----
-  scene.add(new THREE.HemisphereLight('#fffaf0', '#6b5a48', 1.5));
+  scene.add(new THREE.HemisphereLight('#fffaf0', '#8a7a68', 1.6));
+  scene.add(new THREE.AmbientLight('#ffffff', 0.9));
   const dir = new THREE.DirectionalLight('#fff3e0', 0.6); dir.position.set(30, 20, 5); scene.add(dir);
 
   // ---- modello vero della sala (SketchUp dell'architetto, alleggerito) ----
   // Coordinate del modello in metri: ledwall sulla parete z = -27.7, da x 14.15 a 37.15, bordo alto a 4.5 m.
+  // tolti per vedere meglio: la parete di fondo (di fronte al ledwall, z ≈ 0, con schermi SONG e uscite di emergenza; la regia resta)
+  // e il soffitto (si taglia tutto sopra 4.6 m, poco sopra il bordo alto del ledwall)
+  renderer.localClippingEnabled = true;
+  const tagli = [new THREE.Plane(new THREE.Vector3(0, 0, -1), -0.4), new THREE.Plane(new THREE.Vector3(0, -1, 0), 4.6)];
   const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
-  loader.load('./chiesa3d.glb?v=1', g => {
+  loader.load('./chiesa3d.glb?v=2', g => {
+    // quello che nel modello sta appoggiato sul ledwall (sfondo nero, logo) si nasconde: al suo posto ci sono i moduli veri
+    g.scene.updateMatrixWorld(true);
+    const zonaLed = [new THREE.Box3(new THREE.Vector3(14.0, 1.4, -27.95), new THREE.Vector3(37.3, 4.6, -27.45)),
+                     new THREE.Box3(new THREE.Vector3(13.2, 2.4, -27.4), new THREE.Vector3(14.2, 4.6, -24.2))];
+    const bb = new THREE.Box3();
     g.scene.traverse(o => {
       if (!o.isMesh) return;
+      if (!o.isInstancedMesh) {
+        if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+        bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+        if (zonaLed.some(z => z.containsBox(bb))) { o.visible = false; return; }
+      }
       const ms = [].concat(o.material);
       if (ms.some(m => m.name === 'Sfondo ledwall')) { o.visible = false; return; }   // al suo posto mettiamo i moduli veri
-      ms.forEach(m => { m.metalness = 0; m.roughness = Math.max(0.6, m.roughness ?? 1); if (!o.geometry.attributes.normal) m.flatShading = true; });
+      // soffitto, controsoffitti, travi e faretti (tutto quello appeso sopra 3.3 m) non si mostrano
+      if (!o.isInstancedMesh && bb.min.y > 3.3 && bb.max.y - bb.min.y < 1.6) { o.visible = false; return; }
+      if (o.isInstancedMesh) {   // faretti a incasso e simili ripetuti nel soffitto
+        if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+        const mi = new THREE.Matrix4(); o.getMatrixAt(0, mi);
+        bb.copy(o.geometry.boundingBox).applyMatrix4(mi).applyMatrix4(o.matrixWorld);
+        if (bb.min.y > 3.3) { o.visible = false; return; }
+      }
+      ms.forEach(m => { m.clippingPlanes = tagli; m.metalness = 0; m.roughness = Math.max(0.6, m.roughness ?? 1); if (!o.geometry.attributes.normal) m.flatShading = true; });
     });
     scene.add(g.scene); caric.remove();
   }, ev => { if (ev.total) caric.textContent = `Carico il modello della chiesa… ${Math.round(ev.loaded / ev.total * 100)}%`; },
@@ -116,6 +139,7 @@ export function apri(evId) {
     sala: [[25.6, 1.7, -4], [25.6, 3, -27.7]],
     palco: [[22, 1.6, -14], [25, 3, -27.7]],
     alto: [[31, 2.4, -19], [18, 3, -27.5]],
+    regia: [[28.4, 1.9, -2.2], [25.6, 2.8, -27.7]],
   };
   const vai = n => { const [p, tg] = viste[n]; camera.position.set(...p); controls.target.set(...tg); controls.update(); };
   vai('sala');
