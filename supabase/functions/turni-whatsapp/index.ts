@@ -4,7 +4,7 @@
 //   ?azione=gruppi     -> elenca i gruppi WhatsApp del numero collegato (per trovare il chatId)
 //   ?azione=prova      -> invia il messaggio nella chat con se stesso del numero collegato
 //   ?azione=configura  -> imposta su Green API il webhook dei messaggi in arrivo verso questa funzione
-//   POST con typeWebhook (webhook Green API): se nel gruppo qualcuno scrive "non ci sono", lo sostituisce col prossimo della lista (il jolly solo se nessun altro può)
+//   POST con typeWebhook (webhook Green API): legge italiano e rumeno; "dobbiamo/bisogna/trebuie să…" -> task nel gestionale; se nel gruppo qualcuno scrive "non ci sono", lo sostituisce col prossimo della lista (il jolly solo se nessun altro può)
 //   ?mese=1            -> mese prossimo invece del mese corrente
 //   ?azione=auto       -> (cron ogni 10 min il lunedì mattina) invia il lunedì dopo l'ultima domenica del mese i turni del mese nuovo, a un orario variabile 8:00-11:30
 // Configurazione nella tabella public.config_privata (leggibile solo con service role):
@@ -107,6 +107,35 @@ const OFFERTA = new RegExp([
 ].join("|"));
 const MATTINA = /mattin|diminea/, SERA = /\bsera\b|\bseara\b|stasera|diseara/;
 
+// Cose da fare scritte nel gruppo ("dobbiamo montare lo stage", "trebuie să montăm scena") -> task nel gestionale.
+const TASK_RE = /(?<![\p{L}])(dobbiamo|bisogna|c'e da|ce da|ci tocca|ricordatevi di|ricordiamoci di|da fare\s*:|aggiungi(?:\s+(?:un|il))?\s+task\s*:?|task\s*:|todo\s*:|ne trebuie sa|trebuie sa|trebuie|avem de|nu uitati sa|de facut\s*:)(?![\p{L}])\s*/u;
+const TEMPO = /(?<![\p{L}])(di nuovo|nuovamente|ancora|anche|questa settimana|(la )?settimana prossima|(la )?prossima settimana|entro (il |la |lo )?[\p{L}\d]+|per (il |la )?[\p{L}\d]+ prossim[oa]|oggi|domani|stasera|(questo |sabato |domenica )?pomeriggio|(di |la )?mattina|(lunedì|lunedi|martedì|martedi|mercoledì|mercoledi|giovedì|giovedi|venerdì|venerdi|sabato|domenica)( prossim[oa])?|din nou|iar|și|săptămâna (asta|aceasta|viitoare)|saptamana (asta|aceasta|viitoare)|mâine|maine|azi|astăzi|astazi|sâmbătă|sambata|duminică|duminica|luni|marți|marti|miercuri|joi|vineri|(până|pana)( (la|în|in|pe))? [\p{L}\d]+|per (il |la )?\d{1,2})(?![\p{L}])/giu;
+const GIORNI = [["domenica","duminica"],["lunedi","luni"],["martedi","marti"],["mercoledi","miercuri"],["giovedi","joi"],["venerdi","vineri"],["sabato","sambata"]];
+function scadenzaDa(n: string): string | null {
+  const oggi = ROME(); oggi.setHours(12, 0, 0, 0);
+  const piu = (k: number) => { const x = new Date(oggi); x.setDate(x.getDate() + k); return iso(x); };
+  const domenica = (sett: number) => piu(((7 - oggi.getDay()) % 7) + 7 * sett);
+  if (/(?<![\p{L}])(oggi|azi|astazi|stasera|diseara)(?![\p{L}])/u.test(n)) return piu(0);
+  if (/(?<![\p{L}])(domani|maine)(?![\p{L}])/u.test(n)) return piu(1);
+  if (/(settimana prossima|prossima settimana|saptamana viitoare)/.test(n)) return domenica(1);
+  const num = n.match(/(?<![\p{L}])(?:entro|per|il|pe|pana pe|pana la)\s+(?:il\s+)?([0-9]{1,2})(?![0-9])/u);
+  if (num) { const g = +num[1]; const x = new Date(oggi); if (g < x.getDate()) x.setMonth(x.getMonth() + 1); x.setDate(g); return iso(x); }
+  for (let i = 0; i < 7; i++) if (GIORNI[i].some((g) => new RegExp(`(?<![\\p{L}])${g}(?![\\p{L}])`, "u").test(n))) return piu((i - oggi.getDay() + 7) % 7);
+  if (/(questa settimana|saptamana (asta|aceasta))/.test(n)) return domenica(oggi.getDay() === 0 ? 1 : 0);
+  return null;
+}
+function estraiTask(grezzo: string): { testo: string; scadenza: string | null } | null {
+  let n = ""; const map: number[] = [];
+  for (let i = 0; i < grezzo.length; i++) for (const ch of norm(grezzo[i])) { n += ch; map.push(i); }
+  const m = TASK_RE.exec(n); if (!m) return null;
+  if (/(?<![\p{L}])(non|nu)\s*$/u.test(n.slice(0, m.index))) return null;
+  const s = m.index + m[0].length; if (s >= n.length) return null;
+  let t = grezzo.slice(map[s]).split(/[.!?\n]/)[0];
+  t = t.replace(TEMPO, " ").replace(/\s+/g, " ").replace(/^(sa|să|di|de|a)\s+/i, "").trim().replace(/[\s,;:\-]+$/, "");
+  if (t.length < 3) return null;
+  return { testo: (t[0].toUpperCase() + t.slice(1)).slice(0, 120), scadenza: scadenzaDa(n) };
+}
+
 // Cerca la domenica (oggi o futura, entro 8 settimane) in cui `chi` ha un turno e che corrisponde al testo.
 function trovaTurno(T: Turni, B: Blocco[], chi: string, testo: string): { ds: string; slots: number[] } | null {
   const t = testo.toLowerCase();
@@ -174,11 +203,27 @@ Deno.serve(async (req) => {
     const grezzo: string = md.textMessageData?.textMessage || md.extendedTextMessageData?.text || "";
     const testo = norm(grezzo);
     const assenza = ASSENZA.test(testo), offerta = !assenza && OFFERTA.test(testo);
-    if (!assenza && !offerta) return json({ ok: true });
+    const task = !assenza && !offerta ? estraiTask(grezzo) : null;
+    if (!assenza && !offerta && !task) return json({ ok: true });
     const tel: Record<string, string> = JSON.parse(env.TELEFONI || "{}");
     const nomeDi = (jid?: string) => tel[String(jid || "").replace(/@.*/, "")];
     const chi = nomeDi(sd.sender);
     if (!chi) return json({ ok: true, nota: "numero non riconosciuto" });
+
+    if (task) {
+      // Task visibile a tutti, autore = chi l'ha scritto. user_id obbligatorio: quello dell'account con lo stesso nome (altrimenti un admin).
+      const { data: gia } = await sb.from("attivita").select("id").eq("tipo", "task").eq("fatto", false).ilike("testo", task.testo);
+      if (gia && gia.length) return json({ ok: true, nota: "task già presente" });
+      const { data: ul } = await sb.auth.admin.listUsers({ perPage: 200 });
+      const utenti = ul?.users || [];
+      const u = utenti.find((x) => first(String(x.user_metadata?.nome || "")).toLowerCase() === first(chi).toLowerCase())
+        || utenti.find((x) => x.app_metadata?.ruolo === "admin") || utenti[0];
+      if (!u) return json({ errore: "nessun utente per il task" }, 500);
+      const { error: et } = await sb.from("attivita").insert({ tipo: "task", testo: task.testo, scadenza: task.scadenza, comune: true, chi: null, autore: first(chi), user_id: u.id });
+      if (et) return json({ errore: et.message }, 500);
+      await sb.from("registro").insert({ user_id: null, nome: "WhatsApp", testo: `Task da ${first(chi)}: ${task.testo}` + (task.scadenza ? ` (entro ${breveDi(task.scadenza)})` : "") });
+      return json({ ok: true, task, inviato: false });
+    }
 
     const { data: row, error } = await sb.from("condiviso").select("data").eq("id", "main").maybeSingle();
     if (error || !row?.data?.turni) return json({ errore: error?.message || "turni non trovati" }, 500);
