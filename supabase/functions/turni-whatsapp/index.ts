@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
     const tel: Record<string, string> = JSON.parse(env.TELEFONI || "{}");
     const nomeDi = (jid?: string) => tel[String(jid || "").replace(/@.*/, "")];
     const chi = nomeDi(sd.sender);
-    if (!chi) return json({ ok: true, nota: "numero non riconosciuto" });
+    if (!chi) return json({ ok: true, nota: "numero non riconosciuto", task });
 
     if (task) {
       // Task visibile a tutti, autore = chi l'ha scritto. user_id obbligatorio: quello dell'account con lo stesso nome (altrimenti un admin).
