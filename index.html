@@ -410,6 +410,8 @@ try{applicaTema(localStorage.getItem('ledwall-tema'))}catch(e){applicaTema('ment
 <script id="appjs">
 /* ===================== DATI ===================== */
 const KEY='gestionale-ledwall-v1';
+// le ferie dal portale del lavoro sono state tolte dal sito: cancello dati e credenziali salvati in questo browser
+try{localStorage.removeItem(KEY+'-ferie');localStorage.removeItem(KEY+'-ferie-cred')}catch(e){}
 const CATS={led:'Casse LED',processore:'Processori / Controller',cavo:'Cavi',struttura:'Strutture / Appendimento',audio:'Audio / Video',altro:'Altro'};
 const PER={none:'—',modulo:'per modulo',colonna:'per colonna',fila:'per fila',cassa:'per cassa LED',schermo:'per schermo',evento:'per evento'};
 const uid=()=>Math.random().toString(36).slice(2,10);
