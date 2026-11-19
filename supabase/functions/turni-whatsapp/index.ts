@@ -4,7 +4,7 @@
 //   ?azione=gruppi     -> elenca i gruppi WhatsApp del numero collegato (per trovare il chatId)
 //   ?azione=prova      -> invia il messaggio nella chat con se stesso del numero collegato
 //   ?azione=configura  -> imposta su Green API il webhook dei messaggi in arrivo verso questa funzione
-//   POST con typeWebhook (webhook Green API): legge italiano e rumeno; "dobbiamo/bisogna/trebuie să…" -> task nel gestionale; se nel gruppo qualcuno scrive "non ci sono", lo sostituisce col prossimo della lista (il jolly solo se nessun altro può)
+//   POST con typeWebhook (webhook Green API): "!Turni" -> manda i turni che restano nel mese; legge italiano e rumeno; "dobbiamo/bisogna/trebuie să…" -> task nel gestionale; se nel gruppo qualcuno scrive "non ci sono", lo sostituisce col prossimo della lista (il jolly solo se nessun altro può)
 //   ?mese=1            -> mese prossimo invece del mese corrente
 //   ?azione=auto       -> (cron ogni 10 min il lunedì mattina) invia il lunedì dopo l'ultima domenica del mese i turni del mese nuovo, a un orario variabile 8:00-11:30
 // Configurazione nella tabella public.config_privata (leggibile solo con service role):
@@ -81,6 +81,35 @@ function messaggio(T: Turni, off: number, B: Blocco[]): string {
   ], 3);
   const punto = pick([",", "!", ","], 4);
   return `${saluto}${punto} ${punto === "!" ? intro[0].toUpperCase() + intro.slice(1) : intro}:\n\n${righe.join("\n")}\n\n${fine}`;
+}
+
+// Comando "!Turni": le domeniche che restano nel mese (da oggi); se non ne resta nessuna, il mese dopo.
+function rimanenti(T: Turni, B: Blocco[]): string {
+  const oggi = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Rome" }));
+  const giorno = (k: number) => new Date(Date.UTC(oggi.getFullYear(), oggi.getMonth(), oggi.getDate() + k, 12));
+  let d = giorno(0);
+  while (d.getUTCDay() !== 0) d = new Date(d.getTime() + 864e5);
+  const fineMese = d.getUTCMonth() !== oggi.getMonth();
+  const mo = d.getUTCMonth();
+  const mese = d.toLocaleDateString("it-IT", { month: "long", timeZone: "UTC" });
+  const breve = mese.slice(0, 1).toUpperCase() + mese.slice(1, 3);
+  const nm = (n: string) => (n ? first(n) : "da definire");
+  const righe: string[] = [];
+  while (d.getUTCMonth() === mo) {
+    const ds = d.toISOString().slice(0, 10);
+    const m = turno(T, ds, 0, B), s = turno(T, ds, 1, B);
+    righe.push(`• Domenica ${d.getUTCDate()} ${breve}: ` + (m === s ? nm(m) : `☀️ ${nm(m)} · 🌙 ${nm(s)}`));
+    d.setUTCDate(d.getUTCDate() + 7);
+  }
+  const r = seme(`turni-${Date.now()}`);
+  const pick = <X,>(L: X[], k: number) => L[Math.floor(r(k) * L.length)];
+  const ora = oggi.getHours();
+  const saluto = pick(ora < 12 ? ["Buongiorno", "Ciao ragazzi", "Buongiorno a tutti"] : ora < 18 ? ["Ciao ragazzi", "Ciao a tutti", "Ciao"] : ["Ciao ragazzi", "Ciao a tutti", "Buonasera"], 1);
+  const intro = fineMese
+    ? pick([`ecco i turni di ${mese}`, `questi sono i turni di ${mese}`], 2)
+    : righe.length === 1 ? pick([`a ${mese} resta solo questa domenica`, `ecco l'ultimo turno di ${mese}`], 2)
+    : pick([`ecco i turni che restano a ${mese}`, `questi sono i prossimi turni di ${mese}`, `ecco come siamo messi per il resto di ${mese}`], 2);
+  return `${saluto}, ${intro}:\n\n${righe.join("\n")}`;
 }
 
 const ROME = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Rome" }));
@@ -202,6 +231,15 @@ Deno.serve(async (req) => {
     if (ev?.typeWebhook !== "incomingMessageReceived" || sd.chatId !== env.GREEN_CHAT) return json({ ok: true });
     const grezzo: string = md.textMessageData?.textMessage || md.extendedTextMessageData?.text || "";
     const testo = norm(grezzo);
+    if (testo.trim() === "!turni") {
+      // Richiesta di Beniamin: chi scrive "!Turni" nel gruppo riceve i turni che restano nel mese. Massimo una volta ogni 10 minuti.
+      if (env.ULTIMO_COMANDO && Date.now() - +env.ULTIMO_COMANDO < 10 * 60e3) return json({ ok: true, nota: "comando troppo ravvicinato" });
+      const { data: rc } = await sb.from("condiviso").select("data").eq("id", "main").maybeSingle();
+      if (!rc?.data?.turni) return json({ errore: "turni non trovati" }, 500);
+      await sb.from("config_privata").upsert({ chiave: "ULTIMO_COMANDO", valore: String(Date.now()) });
+      const out = await invia(env.GREEN_CHAT, rimanenti(rc.data.turni as Turni, await caricaBlocchi()));
+      return json({ ok: true, comando: "turni", inviato: out.ok });
+    }
     const assenza = ASSENZA.test(testo), offerta = !assenza && OFFERTA.test(testo);
     const task = !assenza && !offerta ? estraiTask(grezzo) : null;
     if (!assenza && !offerta && !task) return json({ ok: true });
