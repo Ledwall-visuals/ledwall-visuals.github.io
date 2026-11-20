@@ -141,20 +141,25 @@ function barreSettimana(lunedi, larg, alt, cw, gap, celle) {
     const ta = dentro ? ia : x0, tb = dentro ? ib : x1;
     if (tb - ta > 24) c.testo((l.cal || "Lavoro").toUpperCase(), new Rect(ta, y, tb - ta, hb), ["ffffff", 0.4], dentro);
   });
-  // giorno di oggi: solo una cornice, interrotta dove passa una barra
+  // giorno di oggi: solo una cornice, interrotta solo sul lato dove la barra la attraversa davvero
   const oggi0 = new Date(); oggi0.setHours(0, 0, 0, 0); const gi = Math.round((oggi0 - t0) / 864e5);
   if (gi >= 0 && gi < 7) {
     const L = gi * (cw + gap) + 1, R = L + cw - 2, T = 1, B = alt - 1, k = 6;
-    const sopra = barre.some(([u, v]) => u < R && v > L);
+    const tagliaSx = barre.some(([u, v]) => u <= L + 1 && v > L), tagliaDx = barre.some(([u, v]) => u < R && v >= R - 1);
     c.setStrokeColor(new Color("#4f8cff")); c.setLineWidth(2);
     const arco = (pts) => { const p = new PathR(); p.move(pts[0]); for (let q = 1; q < pts.length; q++) p.addLine(pts[q]); c.addPath(p); c.strokePath(); };
     const P = (x, yy) => new Point(x, yy);
-    if (!sopra) { const p = new PathR(); p.addRoundedRect(new Rect(L, T, cw - 2, alt - 2), k, k); c.addPath(p); c.strokePath(); }
-    else {
-      const ya = y - 2, yb = y + hb + 2;
-      arco([P(L, ya), P(L, T + k), P(L + 1.8, T + 1.8), P(L + k, T), P(R - k, T), P(R - 1.8, T + 1.8), P(R, T + k), P(R, ya)]);
-      arco([P(L, yb), P(L, B - k), P(L + 1.8, B - 1.8), P(L + k, B), P(R - k, B), P(R - 1.8, B - 1.8), P(R, B - k), P(R, yb)]);
+    const ya = y - 2, yb = y + hb + 2;
+    // angoli della cornice (smussati come prima)
+    const sopra = [P(L, T + k), P(L + 1.8, T + 1.8), P(L + k, T), P(R - k, T), P(R - 1.8, T + 1.8), P(R, T + k)];
+    const sottoDx = [P(R, B - k), P(R - 1.8, B - 1.8), P(R - k, B), P(L + k, B), P(L + 1.8, B - 1.8), P(L, B - k)];
+    if (!tagliaSx && !tagliaDx) { const p = new PathR(); p.addRoundedRect(new Rect(L, T, cw - 2, alt - 2), k, k); c.addPath(p); c.strokePath(); }
+    else if (tagliaSx && tagliaDx) {
+      arco([P(L, ya), ...sopra, P(R, ya)]);
+      arco([P(L, yb), ...sottoDx.slice().reverse(), P(R, yb)]);
     }
+    else if (tagliaDx) arco([P(R, yb), ...sottoDx, ...sopra, P(R, ya)]); // barra che inizia dentro oggi ed esce a destra
+    else arco([P(L, ya), ...sopra, ...sottoDx, P(L, yb)]); // barra che entra da sinistra e finisce dentro oggi
   }
   return c;
 }
