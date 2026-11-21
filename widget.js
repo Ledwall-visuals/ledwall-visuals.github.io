@@ -67,14 +67,15 @@ const fmX = FileManager.local(), pX = fmX.joinPath(fmX.documentsDirectory(), "le
 let extra = [];
 try { extra = fmX.fileExists(pX) ? JSON.parse(fmX.readString(pX)) : [{ tipo: "straordinario", s: "2026-11-21T06:00", e: "2026-11-21T12:00" }]; } catch (e) { extra = []; }
 const salvaExtra = () => fmX.writeString(pX, JSON.stringify(extra));
-const COL_X = { straordinario: "bf5af2", malattia: "ff453a" }, NOME_X = { straordinario: "Straordinario", malattia: "A casa" };
+const COL_X = { straordinario: "bf5af2", malattia: "ff453a", casa: "30b0c7" }, NOME_X = { straordinario: "Straordinario", malattia: "Malattia", casa: "A casa" };
+const ASSENZA = { malattia: 1, casa: 1 };
 const oraTxt = x => { const m = String(x || "").trim().match(/^(\d{1,2})(?:[:.,](\d{1,2}))?$/); if (!m || +m[1] > 24 || +(m[2] || 0) > 59) return null; return pad(+m[1]) + ":" + pad(+(m[2] || 0)); };
 const SEGNA = (typeof LAVORO !== "undefined" && LAVORO && !config.runsInWidget && args.queryParameters) ? args.queryParameters.segna : null;
 if (SEGNA && /^\d{4}-\d\d-\d\d$/.test(SEGNA)) {
   const giorno = new Date(SEGNA + "T12:00"), titolo = giorno.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
   const delGiorno = extra.filter(x => x.s.slice(0, 10) <= SEGNA && SEGNA <= x.e.slice(0, 10) && !(x.e.slice(0, 10) === SEGNA && x.e.slice(11) === "00:00" && x.s.slice(0, 10) !== SEGNA));
   const m = new Alert(); m.title = titolo.charAt(0).toUpperCase() + titolo.slice(1); m.message = "Cosa vuoi segnare?";
-  m.addAction("⏱ Straordinario"); m.addAction("🏠 Malattia / a casa");
+  m.addAction("⏱ Straordinario"); m.addAction("🤒 Malattia"); m.addAction("🏠 Rimasto a casa");
   delGiorno.forEach(x => m.addDestructiveAction("Togli " + NOME_X[x.tipo].toLowerCase() + (x.tipo === "straordinario" ? " " + x.s.slice(11) + "–" + x.e.slice(11) : "")));
   m.addCancelAction("Annulla");
   const sc = await m.presentSheet();
@@ -89,23 +90,24 @@ if (SEGNA && /^\d{4}-\d\d-\d\d$/.test(SEGNA)) {
         extra.push({ tipo: "straordinario", s: SEGNA + "T" + h1, e: ds(fine) + "T" + (h2 === "24:00" ? "23:59" : h2) }); salvaExtra();
       } else { const er = new Alert(); er.title = "Orario non valido"; er.addAction("OK"); await er.present(); }
     }
-  } else if (sc === 1) {
-    const q = new Alert(); q.title = "Malattia / a casa"; q.message = "Per quanti giorni, da " + giorno.toLocaleDateString("it-IT", { weekday: "short", day: "numeric" }) + "?";
+  } else if (sc === 1 || sc === 2) {
+    const tipo = sc === 1 ? "malattia" : "casa";
+    const q = new Alert(); q.title = sc === 1 ? "Malattia" : "Rimasto a casa"; q.message = "Per quanti giorni, da " + giorno.toLocaleDateString("it-IT", { weekday: "short", day: "numeric" }) + "?";
     q.addTextField("giorni", "1").setNumberPadKeyboard(); q.addAction("Salva"); q.addCancelAction("Annulla");
     if (await q.present() === 0) {
       const n = Math.max(1, Math.min(60, parseInt(q.textFieldValue(0), 10) || 1)); const fine = new Date(SEGNA + "T12:00"); fine.setDate(fine.getDate() + n);
-      extra.push({ tipo: "malattia", s: SEGNA + "T00:00", e: ds(fine) + "T00:00" }); salvaExtra();
+      extra.push({ tipo, s: SEGNA + "T00:00", e: ds(fine) + "T00:00" }); salvaExtra();
     }
-  } else if (sc >= 2) { const x = delGiorno[sc - 2]; extra = extra.filter(y => y !== x); salvaExtra(); }
+  } else if (sc >= 3) { const x = delGiorno[sc - 3]; extra = extra.filter(y => y !== x); salvaExtra(); }
 }
 if (typeof LAVORO !== "undefined" && LAVORO) {
   // eventi dei calendari "Straordinario" / "Malattia" / "A casa" trattati come quelli segnati dal widget
   const daCal = lavoro.filter(l => /^(malattia|a casa)$/i.test((l.cal || "").trim()));
   lavoro = lavoro.filter(l => !daCal.includes(l));
   extra.forEach(x => lavoro.push({ s: new Date(x.s), e: new Date(x.e), all: false, t: NOME_X[x.tipo], cal: NOME_X[x.tipo], col: { hex: COL_X[x.tipo] }, tipo: x.tipo }));
-  daCal.forEach(l => { const [a, b] = l.all ? [new Date(ds(l.s) + "T00:00"), new Date(ds(new Date(l.e.getTime() - 1)) + "T00:00")] : intervallo(l); if (l.all) b.setDate(b.getDate() + 1); lavoro.push({ s: a, e: b, all: false, t: "A casa", cal: "A casa", col: { hex: COL_X.malattia }, tipo: "malattia" }); });
+  daCal.forEach(l => { const [a, b] = l.all ? [new Date(ds(l.s) + "T00:00"), new Date(ds(new Date(l.e.getTime() - 1)) + "T00:00")] : intervallo(l); if (l.all) b.setDate(b.getDate() + 1); const tp = /^malattia$/i.test(l.cal.trim()) ? "malattia" : "casa"; lavoro.push({ s: a, e: b, all: false, t: NOME_X[tp], cal: NOME_X[tp], col: { hex: COL_X[tp] }, tipo: tp }); });
   // nei giorni a casa il turno normale non c'è: lo taglio
-  const casa = lavoro.filter(l => l.tipo === "malattia").map(l => [l.s, l.e]);
+  const casa = lavoro.filter(l => ASSENZA[l.tipo]).map(l => [l.s, l.e]);
   if (casa.length) {
     const nuovo = [];
     lavoro.forEach(l => {
