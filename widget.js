@@ -35,18 +35,13 @@ const hm = dt => pad(dt.getHours()) + ":" + pad(dt.getMinutes());
 let lavoro = [];
 // i turni di lavoro li vede solo chi ha "const LAVORO = true" nello script (Benni)
 if (typeof LAVORO !== "undefined" && LAVORO) try {
-  const cals = (await Calendar.forEvents()).filter(c => calNomi.length ? calNomi.includes(c.title.trim().toLowerCase()) : /^(mattin[ao]|pomeriggio|notte|straordinari[oi])$/i.test(c.title.trim()));
+  const cals = (await Calendar.forEvents()).filter(c => calNomi.length ? calNomi.includes(c.title.trim().toLowerCase()) : /^(mattin[ao]|pomeriggio|notte|straordinari[oi]|malattia|a casa)$/i.test(c.title.trim()));
   if (cals.length) {
     const da = new Date(); da.setDate(1); da.setDate(da.getDate() - 7); da.setHours(0, 0, 0, 0);
     const a = new Date(da); a.setDate(a.getDate() + 60);
     lavoro = (await CalendarEvent.between(da, a, cals)).map(e => ({ s: e.startDate, e: e.endDate, all: e.isAllDay, t: e.title, cal: e.calendar.title, col: e.calendar.color }));
   }
 } catch (e) { lavoro = []; }
-// turni aggiunti a mano (es. straordinari): [inizio, fine, nome]; si vedono come le altre barre
-const EXTRA_LAVORO = [
-  ["2026-11-21T06:00", "2026-11-21T12:00", "Straordinario"],
-];
-if (typeof LAVORO !== "undefined" && LAVORO) EXTRA_LAVORO.forEach(([a, b, n]) => lavoro.push({ s: new Date(a), e: new Date(b), all: false, t: n, cal: n, col: { hex: "bf5af2" } }));
 // le ferie dal portale del lavoro sono state tolte: cancello credenziali e cache salvate sul telefono
 try { for (const k of ["portale-lavoro-cf", "portale-lavoro-pw"]) if (Keychain.contains(k)) Keychain.remove(k); const fmF = FileManager.local(), pF = fmF.joinPath(fmF.documentsDirectory(), "ledwall-ferie.json"); if (fmF.fileExists(pF)) fmF.remove(pF); } catch (e) {}
 // un turno può durare più giorni (es. Mattina da lunedì a venerdì): lo segno su ogni giorno lun-ven del periodo
@@ -65,6 +60,71 @@ function intervallo(l) {
   const a = new Date(l.s); a.setHours(h[0], 0, 0, 0);
   const b = new Date(fineGiorno(l) + "T12:00"); if (h[1] <= h[0]) b.setDate(b.getDate() + 1); b.setHours(h[1], 0, 0, 0);
   return [a, b];
+}
+// --- Straordinari e malattia/a casa segnati dal telefono (solo Benni) ---
+// Si segnano toccando un giorno nel widget: si apre Scriptable con un menu. Salvati in ledwall-extra.json sul telefono.
+const fmX = FileManager.local(), pX = fmX.joinPath(fmX.documentsDirectory(), "ledwall-extra.json");
+let extra = [];
+try { extra = fmX.fileExists(pX) ? JSON.parse(fmX.readString(pX)) : [{ tipo: "straordinario", s: "2026-11-21T06:00", e: "2026-11-21T12:00" }]; } catch (e) { extra = []; }
+const salvaExtra = () => fmX.writeString(pX, JSON.stringify(extra));
+const COL_X = { straordinario: "bf5af2", malattia: "ff453a" }, NOME_X = { straordinario: "Straordinario", malattia: "A casa" };
+const oraTxt = x => { const m = String(x || "").trim().match(/^(\d{1,2})(?:[:.,](\d{1,2}))?$/); if (!m || +m[1] > 24 || +(m[2] || 0) > 59) return null; return pad(+m[1]) + ":" + pad(+(m[2] || 0)); };
+const SEGNA = (typeof LAVORO !== "undefined" && LAVORO && !config.runsInWidget && args.queryParameters) ? args.queryParameters.segna : null;
+if (SEGNA && /^\d{4}-\d\d-\d\d$/.test(SEGNA)) {
+  const giorno = new Date(SEGNA + "T12:00"), titolo = giorno.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
+  const delGiorno = extra.filter(x => x.s.slice(0, 10) <= SEGNA && SEGNA <= x.e.slice(0, 10) && !(x.e.slice(0, 10) === SEGNA && x.e.slice(11) === "00:00" && x.s.slice(0, 10) !== SEGNA));
+  const m = new Alert(); m.title = titolo.charAt(0).toUpperCase() + titolo.slice(1); m.message = "Cosa vuoi segnare?";
+  m.addAction("⏱ Straordinario"); m.addAction("🏠 Malattia / a casa");
+  delGiorno.forEach(x => m.addDestructiveAction("Togli " + NOME_X[x.tipo].toLowerCase() + (x.tipo === "straordinario" ? " " + x.s.slice(11) + "–" + x.e.slice(11) : "")));
+  m.addCancelAction("Annulla");
+  const sc = await m.presentSheet();
+  if (sc === 0) {
+    const q = new Alert(); q.title = "Straordinario"; q.message = "Orario (es. 6 e 12, oppure 6:30)";
+    q.addTextField("dalle", "6").setNumbersAndPunctuationKeyboard(); q.addTextField("alle", "12").setNumbersAndPunctuationKeyboard();
+    q.addAction("Salva"); q.addCancelAction("Annulla");
+    if (await q.present() === 0) {
+      const h1 = oraTxt(q.textFieldValue(0)), h2 = oraTxt(q.textFieldValue(1));
+      if (h1 && h2) {
+        const fine = new Date(SEGNA + "T12:00"); if (h2 <= h1) fine.setDate(fine.getDate() + 1); // oltre mezzanotte
+        extra.push({ tipo: "straordinario", s: SEGNA + "T" + h1, e: ds(fine) + "T" + (h2 === "24:00" ? "23:59" : h2) }); salvaExtra();
+      } else { const er = new Alert(); er.title = "Orario non valido"; er.addAction("OK"); await er.present(); }
+    }
+  } else if (sc === 1) {
+    const q = new Alert(); q.title = "Malattia / a casa"; q.message = "Per quanti giorni, da " + giorno.toLocaleDateString("it-IT", { weekday: "short", day: "numeric" }) + "?";
+    q.addTextField("giorni", "1").setNumberPadKeyboard(); q.addAction("Salva"); q.addCancelAction("Annulla");
+    if (await q.present() === 0) {
+      const n = Math.max(1, Math.min(60, parseInt(q.textFieldValue(0), 10) || 1)); const fine = new Date(SEGNA + "T12:00"); fine.setDate(fine.getDate() + n);
+      extra.push({ tipo: "malattia", s: SEGNA + "T00:00", e: ds(fine) + "T00:00" }); salvaExtra();
+    }
+  } else if (sc >= 2) { const x = delGiorno[sc - 2]; extra = extra.filter(y => y !== x); salvaExtra(); }
+}
+if (typeof LAVORO !== "undefined" && LAVORO) {
+  // eventi dei calendari "Straordinario" / "Malattia" / "A casa" trattati come quelli segnati dal widget
+  const daCal = lavoro.filter(l => /^(malattia|a casa)$/i.test((l.cal || "").trim()));
+  lavoro = lavoro.filter(l => !daCal.includes(l));
+  extra.forEach(x => lavoro.push({ s: new Date(x.s), e: new Date(x.e), all: false, t: NOME_X[x.tipo], cal: NOME_X[x.tipo], col: { hex: COL_X[x.tipo] }, tipo: x.tipo }));
+  daCal.forEach(l => { const [a, b] = l.all ? [new Date(ds(l.s) + "T00:00"), new Date(ds(new Date(l.e.getTime() - 1)) + "T00:00")] : intervallo(l); if (l.all) b.setDate(b.getDate() + 1); lavoro.push({ s: a, e: b, all: false, t: "A casa", cal: "A casa", col: { hex: COL_X.malattia }, tipo: "malattia" }); });
+  // nei giorni a casa il turno normale non c'è: lo taglio
+  const casa = lavoro.filter(l => l.tipo === "malattia").map(l => [l.s, l.e]);
+  if (casa.length) {
+    const nuovo = [];
+    lavoro.forEach(l => {
+      if (l.tipo) { nuovo.push(l); return; }
+      let pezzi = [intervallo(l)];
+      casa.forEach(([ca, cb]) => { pezzi = pezzi.flatMap(([a, b]) => (cb <= a || ca >= b) ? [[a, b]] : [[a, ca], [cb, b]].filter(([u, v]) => v - u > 36e5)); });
+      if (pezzi.length === 1 && +pezzi[0][0] === +intervallo(l)[0] && +pezzi[0][1] === +intervallo(l)[1]) { nuovo.push(l); return; }
+      // i tagli seguono l'orario del turno: finisce all'ora di fine del giorno prima, riprende all'ora di inizio
+      const h = ORE_H[(l.cal || "").trim().toLowerCase()];
+      if (h) pezzi = pezzi.map(([a, b]) => {
+        const a2 = new Date(a), b2 = new Date(b);
+        if (casa.some(([, cb]) => +cb === +a)) a2.setHours(h[0], 0, 0, 0);
+        if (h[1] > h[0] && casa.some(([ca]) => +ca === +b)) { b2.setHours(h[1], 0, 0, 0); b2.setDate(b2.getDate() - 1); }
+        return [a2, b2];
+      }).filter(([a, b]) => b - a > 36e5);
+      pezzi.forEach(([a, b]) => nuovo.push(Object.assign({}, l, { s: a, e: b, all: false })));
+    });
+    lavoro = nuovo;
+  }
 }
 // registratore di disegno: le stesse istruzioni vengono disegnate in un canvas (WebView) per poter "ritagliare" la scritta
 // dalla barra (con la tinta di iOS ogni colore diventa bianco, un buco invece resta del colore dello sfondo).
@@ -292,6 +352,7 @@ if (mode.toLowerCase().startsWith("task")) {
       const s = ds(it.dt), dim = !!it.extra;
       // sfondo cella e cornice di oggi sono disegnati nell'immagine della riga (sotto le barre)
       cell.setPadding(2, 3, 2, 2);
+      if (typeof LAVORO !== "undefined" && LAVORO) cell.url = "scriptable:///run/" + encodeURIComponent(Script.name()) + "?segna=" + s;
       const top = cell.addStack(); top.centerAlignContent();
       txt(top, String(it.dt.getDate()), Font.semiboldSystemFont(10), dim ? new Color("#7d8491", 0.6) : (s === today ? TX : MUT));
       top.addSpacer();
