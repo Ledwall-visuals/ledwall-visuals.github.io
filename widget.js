@@ -35,13 +35,18 @@ const hm = dt => pad(dt.getHours()) + ":" + pad(dt.getMinutes());
 let lavoro = [];
 // i turni di lavoro li vede solo chi ha "const LAVORO = true" nello script (Benni)
 if (typeof LAVORO !== "undefined" && LAVORO) try {
-  const cals = (await Calendar.forEvents()).filter(c => calNomi.length ? calNomi.includes(c.title.trim().toLowerCase()) : /^(mattin[ao]|pomeriggio|notte)$/i.test(c.title.trim()));
+  const cals = (await Calendar.forEvents()).filter(c => calNomi.length ? calNomi.includes(c.title.trim().toLowerCase()) : /^(mattin[ao]|pomeriggio|notte|straordinari[oi])$/i.test(c.title.trim()));
   if (cals.length) {
     const da = new Date(); da.setDate(1); da.setDate(da.getDate() - 7); da.setHours(0, 0, 0, 0);
     const a = new Date(da); a.setDate(a.getDate() + 60);
     lavoro = (await CalendarEvent.between(da, a, cals)).map(e => ({ s: e.startDate, e: e.endDate, all: e.isAllDay, t: e.title, cal: e.calendar.title, col: e.calendar.color }));
   }
 } catch (e) { lavoro = []; }
+// turni aggiunti a mano (es. straordinari): [inizio, fine, nome]; si vedono come le altre barre
+const EXTRA_LAVORO = [
+  ["2026-11-21T06:00", "2026-11-21T12:00", "Straordinario"],
+];
+if (typeof LAVORO !== "undefined" && LAVORO) EXTRA_LAVORO.forEach(([a, b, n]) => lavoro.push({ s: new Date(a), e: new Date(b), all: false, t: n, cal: n, col: { hex: "bf5af2" } }));
 // le ferie dal portale del lavoro sono state tolte: cancello credenziali e cache salvate sul telefono
 try { for (const k of ["portale-lavoro-cf", "portale-lavoro-pw"]) if (Keychain.contains(k)) Keychain.remove(k); const fmF = FileManager.local(), pF = fmF.joinPath(fmF.documentsDirectory(), "ledwall-ferie.json"); if (fmF.fileExists(pF)) fmF.remove(pF); } catch (e) {}
 // un turno può durare più giorni (es. Mattina da lunedì a venerdì): lo segno su ogni giorno lun-ven del periodo
